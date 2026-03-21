@@ -6,11 +6,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/flyers" element={<Flyers />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/map" element={<Map />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/profile" element={<Profile />} />
       </Routes>
     </BrowserRouter>
   )
