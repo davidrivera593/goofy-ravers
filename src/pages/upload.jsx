@@ -6,6 +6,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import './upload_styles.css'
+import { callClaude } from '../lib/claude'
 
 const CITIES = ['Phoenix', 'Tucson', 'Flagstaff', 'Tempe', 'Scottsdale', 'Mesa', 'Other']
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
@@ -67,76 +68,57 @@ export default function Upload() {
   }
 
   // ── Claude AI parser ──────────────────────────────────────────────
-  // Converts image to base64 then sends to Claude to extract event info.
+  // Converts image to base64 then sends to Claude via Firebase Function proxy.
   // Fills in the form fields automatically.
   async function parseWithClaude(file) {
     setStatus('parsing')
     try {
       const base64 = await fileToBase64(file)
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-         },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: file.type,
-                    data: base64,
-                  },
-                },
-                {
-                  type: 'text',
-                  text: `Extract event details from this rave/event flyer. Return ONLY a JSON object with no markdown, no backticks, no explanation. Use these exact keys:
-{
-  "title": "event name or empty string",
-  "date": "date in YYYY-MM-DD format or empty string",
-  "venue": "venue name or empty string",
-  "city": "city name or empty string",
-  "genres": "comma-separated genres like techno, house, dnb or empty string",
-  "djs": "comma-separated DJ names or empty string"
-}`,
-                },
-              ],
-            },
-          ],
-        }),
+      const text = await callClaude({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: file.type, data: base64 },
+              },
+              {
+                type: 'text',
+                text: `Extract event details from this rave/event flyer. Return ONLY a JSON object with no markdown, no backticks, no explanation. Use these exact keys:
+  {
+    "title": "event name or empty string",
+    "date": "date in YYYY-MM-DD format or empty string",
+    "venue": "venue name or empty string",
+    "city": "city name or empty string",
+    "genres": "comma-separated genres like techno, house, dnb or empty string",
+    "djs": "comma-separated DJ names or empty string"
+  }`,
+              },
+            ],
+          },
+        ],
       })
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ''
+    const clean = text.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(clean)
 
-      // Strip any accidental markdown fences then parse
-      const clean = text.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
-
-      setForm({
-        title: parsed.title ?? '',
-        date: parsed.date ?? '',
-        venue: parsed.venue ?? '',
-        city: parsed.city ?? '',
-        genres: parsed.genres ?? '',
-        djs: parsed.djs ?? '',
-      })
-      setStatus('idle')
-    } catch (err) {
-      console.error('Claude parse error:', err)
-      // Non-fatal — user can fill in manually
-      setStatus('idle')
-    }
+    setForm({
+      title: parsed.title ?? '',
+      date: parsed.date ?? '',
+      venue: parsed.venue ?? '',
+      city: parsed.city ?? '',
+      genres: parsed.genres ?? '',
+      djs: parsed.djs ?? '',
+    })
+    setStatus('idle')
+  } catch (err) {
+    console.error('Claude parse error:', err)
+    // Non-fatal — user can fill in manually
+    setStatus('idle')
   }
+}
 
   // ── Submit ────────────────────────────────────────────────────────
   async function handleSubmit(e) {
