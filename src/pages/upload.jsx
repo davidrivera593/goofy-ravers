@@ -459,6 +459,7 @@ function buildFlyerPayload({ form, currentUser, imageUrl }) {
   return {
     imageUrl,
     uploadedBy: currentUser.uid,
+    uploadedByName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver',
     uploadedAt: serverTimestamp(),
     title: form.title.trim(),
     date: form.date.trim(),
