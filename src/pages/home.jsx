@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut,
 } from 'firebase/auth'
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
-import { auth, storage } from '../firebase/config'
+import { auth } from '../firebase/config'
 
 const googleProvider = new GoogleAuthProvider()
 
 export default function Home() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,21 +20,23 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [uploadFile, setUploadFile] = useState(null)
-  const [uploadProgress, setUploadProgress] = useState(null)
-  const [uploadedUrl, setUploadedUrl] = useState('')
+  const [isSuccess, setIsSuccess] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user)
     })
-
     return () => unsubscribe()
   }, [])
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  useEffect(() => {
+    if (currentUser) navigate('/dashboard', { replace: true })
+  }, [currentUser, navigate])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
     setMessage('')
+    setIsSuccess(false)
 
     if (mode === 'signup' && password !== confirmPassword) {
       setMessage('Passwords do not match.')
@@ -43,15 +45,14 @@ export default function Home() {
 
     try {
       setLoading(true)
-
       if (mode === 'signup') {
         await createUserWithEmailAndPassword(auth, email, password)
-        setMessage('Account created successfully.')
+        setMessage('Account created.')
       } else {
         await signInWithEmailAndPassword(auth, email, password)
-        setMessage('Logged in successfully.')
+        setMessage('Logged in.')
       }
-
+      setIsSuccess(true)
       setPassword('')
       setConfirmPassword('')
     } catch (error) {
@@ -61,25 +62,12 @@ export default function Home() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      setLoading(true)
-      await signOut(auth)
-      setMessage('Logged out successfully.')
-    } catch (error) {
-      setMessage(error.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleGoogleAuth() {
     setMessage('')
-
+    setIsSuccess(false)
     try {
       setLoading(true)
       await signInWithPopup(auth, googleProvider)
-      setMessage('Signed in with Google successfully.')
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -87,117 +75,101 @@ export default function Home() {
     }
   }
 
-  function handleUpload() {
-    if (!uploadFile || !currentUser) return
-    const storageRef = ref(storage, `flyers/${currentUser.uid}/${Date.now()}-${uploadFile.name}`)
-    const task = uploadBytesResumable(storageRef, uploadFile)
+  if (currentUser) {
+    return (
+      <main className="auth-page">
+        <div className="auth-grid" />
 
-    task.on(
-      'state_changed',
-      (snapshot) => {
-        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-        setUploadProgress(pct)
-      },
-      (error) => {
-        setMessage(`Upload error: ${error.message}`)
-        setUploadProgress(null)
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref)
-        setUploadedUrl(url)
-        setUploadProgress(null)
-        setMessage('Upload successful!')
-      },
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="auth-logo-mark">GR</div>
+            <span className="auth-logo-text">Goofy Ravers</span>
+          </div>
+
+          <h1>Redirecting...</h1>
+          <p className="auth-subtitle">Taking you to your dashboard.</p>
+        </div>
+      </main>
     )
   }
 
   return (
     <main className="auth-page">
-      <section className="auth-card">
-        <h1>{mode === 'login' ? 'Login' : 'Sign Up'}</h1>
+      <div className="auth-grid" />
+      <div className="auth-card">
+        <div className="auth-logo">
+          <div className="auth-logo-mark">GR</div>
+          <span className="auth-logo-text">Goofy Ravers</span>
+        </div>
 
-        {currentUser ? (
-          <div className="auth-session">
-            <p>
-              Signed in as <strong>{currentUser.email}</strong>
-            </p>
-            <button type="button" onClick={handleLogout} disabled={loading}>
-              {loading ? 'Working...' : 'Logout'}
-            </button>
+        <h1>{mode === 'login' ? 'Welcome back' : 'Join the scene'}</h1>
+        <p className="auth-subtitle">
+          {mode === 'login'
+            ? 'Sign in to access the AZ rave network.'
+            : 'Create an account to find events near you.'}
+        </p>
 
-            <hr />
-            <p><strong>Test Flyer Upload</strong></p>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleGoogleAuth}
+          disabled={loading}
+          style={{ marginBottom: '16px' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div className="auth-divider">or</div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
+            Email
             <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setUploadFile(e.target.files[0])}
-            />
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={!uploadFile || uploadProgress !== null}
-            >
-              {uploadProgress !== null ? `Uploading... ${uploadProgress}%` : 'Upload'}
-            </button>
-
-            {uploadedUrl && (
-              <div>
-                <p>Uploaded URL:</p>
-                <a href={uploadedUrl} target="_blank" rel="noreferrer">{uploadedUrl}</a>
-                <br />
-                <img src={uploadedUrl} alt="uploaded flyer" style={{ maxWidth: '200px', marginTop: '8px' }} />
-              </div>
-            )}
-          </div>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
               type="email"
               autoComplete="email"
+              placeholder="you@example.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
+          </label>
 
-            <label htmlFor="password">Password</label>
+          <label>
+            Password
             <input
-              id="password"
               type="password"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              placeholder="••••••••"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </label>
 
-            {mode === 'signup' && (
-              <>
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  required
-                />
-              </>
-            )}
+          {mode === 'signup' && (
+            <label>
+              Confirm Password
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </label>
+          )}
 
-            <button type="submit" disabled={loading}>
-              {loading
-                ? 'Working...'
-                : mode === 'login'
-                  ? 'Login'
-                  : 'Create Account'}
-            </button>
-
-            <button type="button" onClick={handleGoogleAuth} disabled={loading}>
-              Continue with Google
-            </button>
-          </form>
-        )}
+          <button type="submit" className="btn-primary" disabled={loading}>
+            {loading ? 'Working...' : mode === 'login' ? 'Sign in' : 'Create account'}
+          </button>
+        </form>
 
         <button
           type="button"
@@ -205,16 +177,19 @@ export default function Home() {
           onClick={() => {
             setMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'))
             setMessage('')
+            setIsSuccess(false)
           }}
-          disabled={loading || Boolean(currentUser)}
+          disabled={loading}
         >
           {mode === 'login'
-            ? "Need an account? Switch to Sign Up"
-            : 'Already have an account? Switch to Login'}
+            ? <>No account? <span>Sign up free →</span></>
+            : <>Already have one? <span>Sign in →</span></>}
         </button>
 
-        {message && <p className="auth-message">{message}</p>}
-      </section>
+        {message && (
+          <p className={`auth-message${isSuccess ? ' success' : ''}`}>{message}</p>
+        )}
+      </div>
     </main>
   )
 }
