@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut,
 } from 'firebase/auth'
 import { auth } from '../firebase/config'
 
 const googleProvider = new GoogleAuthProvider()
 
 export default function Home() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,6 +28,12 @@ export default function Home() {
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [currentUser, navigate])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -57,18 +64,6 @@ export default function Home() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      setLoading(true)
-      await signOut(auth)
-      setMessage('Logged out successfully.')
-    } catch (error) {
-      setMessage(error.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleGoogleAuth() {
     setMessage('')
 
@@ -88,16 +83,7 @@ export default function Home() {
       <section className="auth-card">
         <h1>{mode === 'login' ? 'Login' : 'Sign Up'}</h1>
 
-        {currentUser ? (
-          <div className="auth-session">
-            <p>
-              Signed in as <strong>{currentUser.email}</strong>
-            </p>
-            <button type="button" onClick={handleLogout} disabled={loading}>
-              {loading ? 'Working...' : 'Logout'}
-            </button>
-          </div>
-        ) : (
+        {currentUser ? null : (
           <form className="auth-form" onSubmit={handleSubmit}>
             <label htmlFor="email">Email</label>
             <input
