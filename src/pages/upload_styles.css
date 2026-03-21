@@ -33,6 +33,18 @@
 .drop-zone.has-image {
   min-height: unset;
   border-style: solid;
+  position: relative;
+}
+
+.drop-zone-preview-link {
+  display: block;
+}
+
+.drop-zone-reupload {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
 }
 
 .drop-zone-preview {
@@ -40,10 +52,12 @@
   height: min(300px, 70vh);
   max-width: 300px;
   max-height: 300px;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   border-radius: 12px;
+  background: var(--bg2);
   margin: 16px auto;
+  cursor: zoom-in;
 }
 
 .drop-zone-empty {
