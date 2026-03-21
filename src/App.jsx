@@ -5,6 +5,7 @@ import Home from './pages/home'
 import Dashboard from './pages/dashboard'
 import Flyers from './pages/flyers'
 import Upload from './pages/upload'
+import Profile from './pages/profile'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -57,6 +58,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Upload />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

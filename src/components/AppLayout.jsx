@@ -41,12 +41,12 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
         </div>
 
         <div className="nav-right">
-          <div className="nav-user">
+          <button className="nav-user" onClick={() => navigate('/profile')}>
             <div className="nav-avatar">{initials}</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>
               {displayName}
             </span>
-          </div>
+          </button>
           <button className="btn-logout" onClick={handleLogout}>
             Sign out
           </button>

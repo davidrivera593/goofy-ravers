@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   city: '',
   genres: '',
   djs: '',
+  description: '',
 }
 
 export default function Upload() {
@@ -83,8 +84,8 @@ export default function Upload() {
           'anthropic-dangerous-direct-browser-access': 'true',
          },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
           messages: [
             {
               role: 'user',
@@ -99,14 +100,17 @@ export default function Upload() {
                 },
                 {
                   type: 'text',
-                  text: `Extract event details from this rave/event flyer. Return ONLY a JSON object with no markdown, no backticks, no explanation. Use these exact keys:
+                  text: `You are parsing event flyers for an Arizona underground rave and electronic music platform. The cities we operate in are: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa.
+
+Extract event details from this flyer and return ONLY a valid JSON object — no markdown, no backticks, no explanation:
 {
-  "title": "event name or empty string",
-  "date": "date in YYYY-MM-DD format or empty string",
-  "venue": "venue name or empty string",
-  "city": "city name or empty string",
-  "genres": "comma-separated genres like techno, house, dnb or empty string",
-  "djs": "comma-separated DJ names or empty string"
+  "title": "the event or night name (not the venue name) or empty string",
+  "date": "date in YYYY-MM-DD format — if no year is listed assume ${new Date().getFullYear()} — or empty string",
+  "venue": "the physical venue or club name or empty string",
+  "city": "must be exactly one of: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa, Other — or empty string",
+  "genres": "comma-separated music genres (e.g. techno, house, dnb, psytrance) or empty string",
+  "djs": "comma-separated performer and DJ names exactly as written on the flyer or empty string",
+  "description": "any additional details from the flyer such as ticket info, age restrictions, dress code, promoter notes, or other text not captured by the other fields — or empty string"
 }`,
                 },
               ],
@@ -118,9 +122,11 @@ export default function Upload() {
       const data = await response.json()
       const text = data.content?.[0]?.text ?? ''
 
-      // Strip any accidental markdown fences then parse
-      const clean = text.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
+      // Extract the JSON object from the response — handles accidental markdown fences,
+      // leading/trailing text, or any other unexpected wrapper Claude might include
+      const match = text.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('No JSON found in Claude response')
+      const parsed = JSON.parse(match[0])
 
       setForm({
         title: parsed.title ?? '',
@@ -129,6 +135,7 @@ export default function Upload() {
         city: parsed.city ?? '',
         genres: parsed.genres ?? '',
         djs: parsed.djs ?? '',
+        description: parsed.description ?? '',
       })
       setStatus('idle')
     } catch (err) {
@@ -374,6 +381,20 @@ export default function Upload() {
                     disabled={status === 'parsing'}
                   />
                 </div>
+
+                <div className="upload-field upload-field-full">
+                  <label className="upload-field-label" htmlFor="description">
+                    Description <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <textarea
+                    id="description"
+                    className="upload-field-input upload-field-textarea"
+                    placeholder="Ticket info, age restrictions, dress code, promoter notes..."
+                    value={form.description}
+                    onChange={(e) => handleField('description', e.target.value)}
+                    disabled={status === 'parsing'}
+                  />
+                </div>
               </div>
 
               <div className="upload-actions">
@@ -438,6 +459,7 @@ function buildFlyerPayload({ form, currentUser, imageUrl }) {
   return {
     imageUrl,
     uploadedBy: currentUser.uid,
+    uploadedByName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver',
     uploadedAt: serverTimestamp(),
     title: form.title.trim(),
     date: form.date.trim(),
@@ -451,6 +473,7 @@ function buildFlyerPayload({ form, currentUser, imageUrl }) {
       .split(',')
       .map((dj) => dj.trim())
       .filter(Boolean),
+    description: form.description.trim(),
     parsed: form.title.trim() !== '',
   }
 }
