@@ -7,7 +7,8 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import { auth, storage } from '../firebase/config'
 
 const googleProvider = new GoogleAuthProvider()
 
@@ -19,6 +20,9 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadedUrl, setUploadedUrl] = useState('')
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -83,6 +87,30 @@ export default function Home() {
     }
   }
 
+  function handleUpload() {
+    if (!uploadFile || !currentUser) return
+    const storageRef = ref(storage, `flyers/${currentUser.uid}/${Date.now()}-${uploadFile.name}`)
+    const task = uploadBytesResumable(storageRef, uploadFile)
+
+    task.on(
+      'state_changed',
+      (snapshot) => {
+        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+        setUploadProgress(pct)
+      },
+      (error) => {
+        setMessage(`Upload error: ${error.message}`)
+        setUploadProgress(null)
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref)
+        setUploadedUrl(url)
+        setUploadProgress(null)
+        setMessage('Upload successful!')
+      },
+    )
+  }
+
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -96,6 +124,30 @@ export default function Home() {
             <button type="button" onClick={handleLogout} disabled={loading}>
               {loading ? 'Working...' : 'Logout'}
             </button>
+
+            <hr />
+            <p><strong>Test Flyer Upload</strong></p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setUploadFile(e.target.files[0])}
+            />
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={!uploadFile || uploadProgress !== null}
+            >
+              {uploadProgress !== null ? `Uploading... ${uploadProgress}%` : 'Upload'}
+            </button>
+
+            {uploadedUrl && (
+              <div>
+                <p>Uploaded URL:</p>
+                <a href={uploadedUrl} target="_blank" rel="noreferrer">{uploadedUrl}</a>
+                <br />
+                <img src={uploadedUrl} alt="uploaded flyer" style={{ maxWidth: '200px', marginTop: '8px' }} />
+              </div>
+            )}
           </div>
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
