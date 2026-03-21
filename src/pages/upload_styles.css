@@ -211,6 +211,12 @@
   background: var(--surface);
 }
 
+.upload-field-textarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.6;
+}
+
 .upload-actions {
   display: flex;
   justify-content: flex-end;
