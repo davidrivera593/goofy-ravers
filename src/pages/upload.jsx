@@ -219,7 +219,32 @@ export default function Upload() {
             onDrop={handleDrop}
           >
             {imagePreview ? (
-              <img src={imagePreview} alt="Flyer preview" className="drop-zone-preview" />
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary drop-zone-reupload"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    fileInputRef.current?.click()
+                  }}
+                >
+                  Choose different image
+                </button>
+
+                <a
+                  href={imagePreview}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="drop-zone-preview-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={imagePreview}
+                    alt="Flyer preview"
+                    className="drop-zone-preview"
+                  />
+                </a>
+              </>
             ) : (
               <div className="drop-zone-empty">
                 <span className="drop-zone-icon">🎴</span>
