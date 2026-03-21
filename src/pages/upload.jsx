@@ -6,6 +6,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import './upload_styles.css'
+import { callClaude } from '../lib/claude'
 
 const CITIES = ['Phoenix', 'Tucson', 'Flagstaff', 'Tempe', 'Scottsdale', 'Mesa', 'Other']
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
@@ -68,39 +69,29 @@ export default function Upload() {
   }
 
   // ── Claude AI parser ──────────────────────────────────────────────
-  // Converts image to base64 then sends to Claude to extract event info.
+  // Converts image to base64 then sends to Claude via Firebase Function proxy.
   // Fills in the form fields automatically.
   async function parseWithClaude(file) {
     setStatus('parsing')
     try {
       const base64 = await fileToBase64(file)
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-         },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 512,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: file.type,
-                    data: base64,
-                  },
+      const text = await callClaude({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: file.type,
+                  data: base64,
                 },
-                {
-                  type: 'text',
-                  text: `You are parsing event flyers for an Arizona underground rave and electronic music platform. The cities we operate in are: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa.
+              },
+              {
+                type: 'text',
+                text: `You are parsing event flyers for an Arizona underground rave and electronic music platform. The cities we operate in are: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa.
 
 Extract event details from this flyer and return ONLY a valid JSON object — no markdown, no backticks, no explanation:
 {
@@ -112,21 +103,14 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
   "djs": "comma-separated performer and DJ names exactly as written on the flyer or empty string",
   "description": "any additional details from the flyer such as ticket info, age restrictions, dress code, promoter notes, or other text not captured by the other fields — or empty string"
 }`,
-                },
-              ],
-            },
-          ],
-        }),
+              },
+            ],
+          },
+        ],
       })
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ''
-
-      // Extract the JSON object from the response — handles accidental markdown fences,
-      // leading/trailing text, or any other unexpected wrapper Claude might include
-      const match = text.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error('No JSON found in Claude response')
-      const parsed = JSON.parse(match[0])
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
 
       setForm({
         title: parsed.title ?? '',
