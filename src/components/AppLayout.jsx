@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 
@@ -23,10 +23,10 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
   return (
     <div className="dashboard">
       <nav className="dashboard-nav">
-        <a className="nav-logo" href="/dashboard">
+        <Link className="nav-logo" to="/dashboard">
           <div className="nav-logo-mark">GR</div>
           <span className="nav-logo-text">GOOFY RAVERS</span>
-        </a>
+        </Link>
 
         <div className="nav-links">
           {NAV_LINKS.map((link) => (
