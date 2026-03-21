@@ -1,15 +1,227 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
+import PostModal from '../components/PostModal'
 
+const STATUS_COLLAPSE_CHARS = 180
+
+function mergeByDate(a, b) {
+  return [...a, ...b].sort((x, y) => {
+    const tx = x.uploadedAt?.toMillis?.() ?? 0
+    const ty = y.uploadedAt?.toMillis?.() ?? 0
+    return ty - tx
+  })
+}
+
+function CardCounts({ post }) {
+  const likeCount = Array.isArray(post.likes) ? post.likes.length : 0
+  const commentCount = typeof post.commentCount === 'number' ? post.commentCount : 0
+  return (
+    <div className="feed-post-counts">
+      <span className="feed-post-count">♥ {likeCount}</span>
+      <span className="feed-post-count">💬 {commentCount}</span>
+    </div>
+  )
+}
+
+function PostHeader({ post }) {
+  const posterName = post.uploadedByName || 'Raver'
+  return (
+    <div className="feed-post-header">
+      <div className="feed-post-avatar">{posterName[0].toUpperCase()}</div>
+      <div>
+        <div className="feed-post-name">{posterName}</div>
+        {post.uploadedAt?.toDate && (
+          <div className="feed-post-date">
+            {post.uploadedAt.toDate().toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric',
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FlyerPost({ post, onClick }) {
+  return (
+    <article className="feed-post feed-post-clickable" onClick={onClick}>
+      {post.imageUrl && (
+        <img
+          src={post.imageUrl}
+          alt={post.title ? `${post.title} flyer` : 'Flyer'}
+          className="feed-post-image"
+        />
+      )}
+      <div className="feed-post-body">
+        <PostHeader post={post} />
+        <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
+        <div className="feed-post-meta">
+          {post.date && <span>📅 {post.date}</span>}
+          {post.city && <span>📍 {post.city}</span>}
+          {post.venue && <span>🏛 {post.venue}</span>}
+        </div>
+        {Array.isArray(post.genres) && post.genres.length > 0 && (
+          <div className="feed-post-tags">
+            {post.genres.map((g) => <span key={g} className="feed-tag">#{g}</span>)}
+          </div>
+        )}
+        {Array.isArray(post.djs) && post.djs.length > 0 && (
+          <p className="feed-post-djs">🎧 {post.djs.join(', ')}</p>
+        )}
+        {post.description && (
+          <p className="feed-post-desc">{post.description}</p>
+        )}
+        <CardCounts post={post} />
+      </div>
+    </article>
+  )
+}
+
+function StatusPost({ post, onClick }) {
+  const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
+  const displayText = isLong
+    ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
+    : post.text
+  return (
+    <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
+      <div className="feed-post-body">
+        <PostHeader post={post} />
+        {post.imageUrl && (
+          <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
+        )}
+        <div className="feed-post-status-text-wrap feed-post-status-collapsed">
+          <p className="feed-post-status-text">{displayText}</p>
+          {isLong && <div className="feed-post-status-fade" />}
+        </div>
+        <CardCounts post={post} />
+      </div>
+    </article>
+  )
+}
+
+// ── Status composer ──────────────────────────────────────────────────────────
+function StatusComposer({ currentUser }) {
+  const navigate = useNavigate()
+  const [expanded, setExpanded] = useState(false)
+  const [text, setText] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState('')
+
+  const displayName =
+    currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
+
+  async function handlePost() {
+    if (!text.trim()) return
+    setPosting(true)
+    setError('')
+    try {
+      await addDoc(collection(db, 'posts'), {
+        postType: 'status',
+        text: text.trim(),
+        uploadedBy: currentUser.uid,
+        uploadedByName: displayName,
+        uploadedAt: serverTimestamp(),
+        likes: [],
+        commentCount: 0,
+      })
+      setText('')
+      setExpanded(false)
+    } catch (err) {
+      console.error('Failed to post:', err)
+      setError('Could not post. Try again.')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  if (!expanded) {
+    return (
+      <div
+        className="feed-compose"
+        onClick={() => setExpanded(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(true) }}
+      >
+        <div className="feed-compose-avatar">{displayName[0].toUpperCase()}</div>
+        <div className="feed-compose-input">Drop a flyer or share what's happening...</div>
+        <button
+          type="button"
+          className="upload-flyer-btn feed-compose-btn"
+          onClick={(e) => { e.stopPropagation(); navigate('/upload') }}
+        >
+          Upload flyer
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="feed-compose feed-compose-expanded">
+      <div className="feed-compose-top">
+        <div className="feed-compose-avatar">{displayName[0].toUpperCase()}</div>
+        <textarea
+          className="feed-compose-textarea"
+          placeholder="What's happening in the scene?"
+          rows={3}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          autoFocus
+          maxLength={1000}
+        />
+      </div>
+      {error && <p className="feed-compose-error">{error}</p>}
+      <div className="feed-compose-actions">
+        <div className="feed-compose-actions-left">
+          <button
+            type="button"
+            className="feed-compose-flyer-link"
+            onClick={() => navigate('/upload')}
+          >
+            + Upload a flyer instead
+          </button>
+        </div>
+        <div className="feed-compose-actions-right">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => { setExpanded(false); setText(''); setError('') }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handlePost}
+            disabled={posting || !text.trim()}
+          >
+            {posting ? 'Posting…' : 'Post'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate()
   const [currentUser, setCurrentUser] = useState(null)
-  const [posts, setPosts] = useState([])
+  const [flyers, setFlyers] = useState([])
+  const [statusPosts, setStatusPosts] = useState([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
+  const [selectedPost, setSelectedPost] = useState(null) // { id, col }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -18,29 +230,34 @@ export default function Dashboard() {
     return () => unsubscribe()
   }, [])
 
-  // Load all users' posts — community feed
+  // Live feed — flyers collection
   useEffect(() => {
-    const postsQuery = query(
-      collection(db, 'flyers'),
-      orderBy('uploadedAt', 'desc'),
-    )
-
-    const unsubscribe = onSnapshot(
-      postsQuery,
-      (snapshot) => {
-        setPosts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-        setIsLoadingPosts(false)
-      },
-      (err) => {
-        console.error('Failed to load feed:', err)
-        setIsLoadingPosts(false)
-      },
-    )
-
-    return () => unsubscribe()
+    const q = query(collection(db, 'flyers'), orderBy('uploadedAt', 'desc'))
+    return onSnapshot(q, (snap) => {
+      setFlyers(snap.docs.map((d) => ({ id: d.id, _col: 'flyers', ...d.data() })))
+      setIsLoadingPosts(false)
+    }, (err) => {
+      console.error('Failed to load flyers:', err)
+      setIsLoadingPosts(false)
+    })
   }, [])
 
-  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
+  // Live feed — status posts collection
+  useEffect(() => {
+    const q = query(collection(db, 'posts'), orderBy('uploadedAt', 'desc'))
+    return onSnapshot(q, (snap) => {
+      setStatusPosts(snap.docs.map((d) => ({ id: d.id, _col: 'posts', ...d.data() })))
+    }, (err) => {
+      console.error('Failed to load posts:', err)
+    })
+  }, [])
+
+  const posts = mergeByDate(flyers, statusPosts)
+
+  // Derive the live post from state so likes update in real time
+  const liveSelectedPost = selectedPost
+    ? posts.find((p) => p.id === selectedPost.id && p._col === selectedPost.col) ?? null
+    : null
 
   return (
     <AppLayout
@@ -57,31 +274,11 @@ export default function Dashboard() {
         </button>
       }
     >
-      {/* ── Create post prompt ── */}
-      <div
-        className="feed-compose"
-        onClick={() => navigate('/upload')}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/upload') }}
-      >
-        <div className="feed-compose-avatar">{displayName[0].toUpperCase()}</div>
-        <div className="feed-compose-input">Drop a flyer or share what's happening...</div>
-        <button
-          type="button"
-          className="upload-flyer-btn feed-compose-btn"
-          onClick={(e) => { e.stopPropagation(); navigate('/upload') }}
-        >
-          Upload flyer
-        </button>
-      </div>
+      {currentUser && <StatusComposer currentUser={currentUser} />}
 
-      {/* ── Community feed ── */}
       <p className="section-label" style={{ marginTop: '32px' }}>Latest posts</p>
 
-      {isLoadingPosts && (
-        <p className="flyers-status">Loading feed...</p>
-      )}
+      {isLoadingPosts && <p className="flyers-status">Loading feed...</p>}
 
       {!isLoadingPosts && posts.length === 0 && (
         <div className="feed-empty">
@@ -101,60 +298,21 @@ export default function Dashboard() {
 
       <div className="feed">
         {posts.map((post) => {
-          const posterName = post.uploadedByName || 'Raver'
-          return (
-            <article key={post.id} className="feed-post">
-              {post.imageUrl && (
-                <img
-                  src={post.imageUrl}
-                  alt={post.title ? `${post.title} flyer` : 'Flyer'}
-                  className="feed-post-image"
-                />
-              )}
-
-              <div className="feed-post-body">
-                <div className="feed-post-header">
-                  <div className="feed-post-avatar">{posterName[0].toUpperCase()}</div>
-                  <div>
-                    <div className="feed-post-name">{posterName}</div>
-                    {post.uploadedAt?.toDate && (
-                      <div className="feed-post-date">
-                        {post.uploadedAt.toDate().toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
-
-                <div className="feed-post-meta">
-                  {post.date && <span>📅 {post.date}</span>}
-                  {post.city && <span>📍 {post.city}</span>}
-                  {post.venue && <span>🏛 {post.venue}</span>}
-                </div>
-
-                {Array.isArray(post.genres) && post.genres.length > 0 && (
-                  <div className="feed-post-tags">
-                    {post.genres.map((g) => (
-                      <span key={g} className="feed-tag">#{g}</span>
-                    ))}
-                  </div>
-                )}
-
-                {Array.isArray(post.djs) && post.djs.length > 0 && (
-                  <p className="feed-post-djs">🎧 {post.djs.join(', ')}</p>
-                )}
-
-                {post.description && (
-                  <p className="feed-post-desc">{post.description}</p>
-                )}
-              </div>
-            </article>
-          )
+          const openModal = () => setSelectedPost({ id: post.id, col: post._col })
+          return post.postType === 'status'
+            ? <StatusPost key={post.id} post={post} onClick={openModal} />
+            : <FlyerPost key={post.id} post={post} onClick={openModal} />
         })}
       </div>
+
+      {liveSelectedPost && (
+        <PostModal
+          post={liveSelectedPost}
+          collection={liveSelectedPost._col}
+          currentUser={currentUser}
+          onClose={() => setSelectedPost(null)}
+        />
+      )}
     </AppLayout>
   )
 }
