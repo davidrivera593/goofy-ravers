@@ -1,16 +1,50 @@
-# React + Vite
+# goofy-ravers
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React (Vite) app with Firebase Auth / Firestore / Storage initialized in `src/firebase/config.js`.
 
-Currently, two official plugins are available:
+## Prereqs
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js (LTS recommended)
+- A Firebase project with a **Web App** created
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Install dependencies:
 
-## Expanding the ESLint configuration
+	 ```bash
+	 npm install
+	 ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2. Create your local env file:
+
+	 - Copy `.env.example` to `.env`
+	 - Fill in the values from: Firebase Console → Project settings → General → Your apps → Web app → SDK setup and configuration
+
+3. Start the dev server:
+
+	 ```bash
+	 npm run dev
+	 ```
+
+## Firebase console checks (for this repo)
+
+This app’s `Home` page uses Email/Password auth and Google sign-in.
+
+- Firebase Console → Authentication → Sign-in method
+	- Enable **Email/Password**
+	- Enable **Google** (pick a support email)
+
+If Google sign-in fails locally, also check:
+
+- Firebase Console → Authentication → Settings → Authorized domains
+	- Ensure `localhost` is present
+
+## Quick “is it wired up?” sanity check
+
+- With `npm run dev` running, open the app and try:
+	- Create account (Email/Password)
+	- Log out
+	- Continue with Google
+- Confirm users appear in Firebase Console → Authentication → Users
+
+If the Firebase env vars are missing, the app will throw a clear error at startup.

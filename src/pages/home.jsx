@@ -75,12 +75,27 @@ export default function Home() {
     }
   }
 
-  const initials = email ? email[0].toUpperCase() : 'G'
+  if (currentUser) {
+    return (
+      <main className="auth-page">
+        <div className="auth-grid" />
+
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="auth-logo-mark">GR</div>
+            <span className="auth-logo-text">Goofy Ravers</span>
+          </div>
+
+          <h1>Redirecting...</h1>
+          <p className="auth-subtitle">Taking you to your dashboard.</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="auth-page">
       <div className="auth-grid" />
-
       <div className="auth-card">
         <div className="auth-logo">
           <div className="auth-logo-mark">GR</div>
@@ -159,7 +174,11 @@ export default function Home() {
         <button
           type="button"
           className="auth-mode-toggle"
-          onClick={() => { setMode(m => m === 'login' ? 'signup' : 'login'); setMessage('') }}
+          onClick={() => {
+            setMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'))
+            setMessage('')
+            setIsSuccess(false)
+          }}
           disabled={loading}
         >
           {mode === 'login'
