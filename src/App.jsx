@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import Home from './pages/home'
 import Dashboard from './pages/dashboard'
+import Flyers from './pages/flyers'
+import Upload from './pages/upload'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -39,6 +41,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/flyers"
+          element={
+            <ProtectedRoute>
+              <Flyers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/upload"
+          element={
+            <ProtectedRoute>
+              <Upload />
             </ProtectedRoute>
           }
         />
