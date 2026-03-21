@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import { auth, storage } from '../firebase/config'
 
 const NAV_LINKS = [
   { label: 'Flyers', path: '/flyers' },
@@ -47,6 +48,10 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadedUrl, setUploadedUrl] = useState('')
+  const [uploadMessage, setUploadMessage] = useState('')
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -63,6 +68,40 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleUpload() {
+    if (!uploadFile || !currentUser) return
+
+    setUploadMessage('')
+    setUploadedUrl('')
+
+    const storageRef = ref(
+      storage,
+      `flyers/${currentUser.uid}/${Date.now()}-${uploadFile.name}`,
+    )
+
+    const task = uploadBytesResumable(storageRef, uploadFile)
+
+    task.on(
+      'state_changed',
+      (snapshot) => {
+        const pct = Math.round(
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100,
+        )
+        setUploadProgress(pct)
+      },
+      (error) => {
+        setUploadMessage(`Upload error: ${error.message}`)
+        setUploadProgress(null)
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref)
+        setUploadedUrl(url)
+        setUploadProgress(null)
+        setUploadMessage('Upload successful!')
+      },
+    )
   }
 
   const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
@@ -139,6 +178,51 @@ export default function Dashboard() {
               <span key={i} className="ticker-tag">#{tag}</span>
             ))}
           </div>
+        </div>
+
+        <p className="section-label" style={{ marginTop: '40px' }}>Test flyer upload</p>
+        <div className="dash-card" style={{ cursor: 'default' }}>
+          <div className="dash-card-title">Upload an image to Firebase Storage</div>
+          <div className="dash-card-desc">
+            This is a dev-only uploader to confirm Storage is wired up.
+          </div>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+            style={{ marginTop: '12px' }}
+          />
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '12px' }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleUpload}
+              disabled={!uploadFile || uploadProgress !== null}
+            >
+              {uploadProgress !== null ? `Uploading... ${uploadProgress}%` : 'Upload'}
+            </button>
+            {uploadMessage && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>{uploadMessage}</span>
+            )}
+          </div>
+
+          {uploadedUrl && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>Uploaded URL:</div>
+              <a href={uploadedUrl} target="_blank" rel="noreferrer">
+                {uploadedUrl}
+              </a>
+              <div style={{ marginTop: '12px' }}>
+                <img
+                  src={uploadedUrl}
+                  alt="uploaded flyer"
+                  style={{ maxWidth: '260px', borderRadius: '12px' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
