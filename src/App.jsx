@@ -6,6 +6,7 @@ import Dashboard from './pages/dashboard'
 import Flyers from './pages/flyers'
 import Upload from './pages/upload'
 import Profile from './pages/profile'
+import Chat from './pages/chat'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -66,6 +67,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <Chat />
             </ProtectedRoute>
           }
         />
