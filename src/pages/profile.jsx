@@ -11,126 +11,8 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore'
-
-// ── Merge + sort helper ────────────────────────────────────────────
-function mergeByDate(a, b) {
-  return [...a, ...b].sort((x, y) => {
-    const xMs = x.uploadedAt?.toMillis?.() ?? 0
-    const yMs = y.uploadedAt?.toMillis?.() ?? 0
-    return yMs - xMs
-  })
-}
 import { auth, db } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
-import PostModal from '../components/PostModal'
-
-// ── Shared post header (avatar + name + date) ─────────────────────
-function PostHeader({ name, uploadedAt }) {
-  return (
-    <div className="feed-post-header">
-      <div className="feed-post-avatar">{name[0].toUpperCase()}</div>
-      <div>
-        <div className="feed-post-name">{name}</div>
-        {uploadedAt?.toDate && (
-          <div className="feed-post-date">
-            {uploadedAt.toDate().toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric',
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Shared card footer: like + comment counts ─────────────────────
-function CardCounts({ post }) {
-  const likeCount = Array.isArray(post.likes) ? post.likes.length : 0
-  const commentCount = typeof post.commentCount === 'number' ? post.commentCount : 0
-  return (
-    <div className="feed-post-counts">
-      <span className="feed-post-count">♥ {likeCount}</span>
-      <span className="feed-post-count">💬 {commentCount}</span>
-    </div>
-  )
-}
-
-// ── Flyer post card ────────────────────────────────────────────────
-function FlyerPost({ post, displayName, onClick }) {
-  const posterName = post.uploadedByName || displayName || 'Raver'
-  return (
-    <article className="feed-post feed-post-clickable" onClick={onClick} role="button" tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.() }}
-    >
-      {post.imageUrl && (
-        <img
-          src={post.imageUrl}
-          alt={post.title ? `${post.title} flyer` : 'Flyer'}
-          className="feed-post-image"
-        />
-      )}
-      <div className="feed-post-body">
-        <PostHeader name={posterName} uploadedAt={post.uploadedAt} />
-        <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
-        <div className="feed-post-meta">
-          {post.date && <span>📅 {post.date}</span>}
-          {post.city && <span>📍 {post.city}</span>}
-          {post.venue && <span>🏛 {post.venue}</span>}
-        </div>
-        {Array.isArray(post.genres) && post.genres.length > 0 && (
-          <div className="feed-post-tags">
-            {post.genres.map((g) => <span key={g} className="feed-tag">#{g}</span>)}
-          </div>
-        )}
-        {Array.isArray(post.djs) && post.djs.length > 0 && (
-          <p className="feed-post-djs">🎧 {post.djs.join(', ')}</p>
-        )}
-        {post.description && (
-          <p className="feed-post-desc">{post.description}</p>
-        )}
-        <CardCounts post={post} />
-      </div>
-    </article>
-  )
-}
-
-// ── Status post card ───────────────────────────────────────────────
-const STATUS_COLLAPSE_CHARS = 180
-
-function StatusPost({ post, displayName, onClick }) {
-  const posterName = post.uploadedByName || displayName || 'Raver'
-  const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
-  const displayText = isLong
-    ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
-    : post.text
-
-  return (
-    <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick} role="button" tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.() }}
-    >
-      <div className="feed-post-body">
-        <PostHeader name={posterName} uploadedAt={post.uploadedAt} />
-        <div className="feed-post-status-text-wrap feed-post-status-collapsed">
-          <p className="feed-post-status-text">{displayText}</p>
-          {isLong && <div className="feed-post-status-fade" />}
-        </div>
-        {post.imageUrl && (
-          <img
-            src={post.imageUrl}
-            alt="Status image"
-            className="feed-post-status-image"
-          />
-        )}
-        {Array.isArray(post.tags) && post.tags.length > 0 && (
-          <div className="feed-post-tags">
-            {post.tags.map((t) => <span key={t} className="feed-tag">#{t}</span>)}
-          </div>
-        )}
-        <CardCounts post={post} />
-      </div>
-    </article>
-  )
-}
 
 export default function Profile() {
   const navigate = useNavigate()
@@ -147,12 +29,9 @@ export default function Profile() {
   const [draftName, setDraftName] = useState('')
   const [draftBio, setDraftBio] = useState('')
 
-  // Posts — from both collections
-  const [flyerPosts, setFlyerPosts] = useState([])
-  const [statusPosts, setStatusPosts] = useState([])
-  const [loadingFlyers, setLoadingFlyers] = useState(true)
-  const [loadingStatus, setLoadingStatus] = useState(true)
-  const [selectedPost, setSelectedPost] = useState(null) // { post, collection }
+  // Posts
+  const [posts, setPosts] = useState([])
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -181,50 +60,25 @@ export default function Profile() {
     return () => unsubscribe()
   }, [currentUser])
 
-  // Load this user's flyers
+  // Load this user's posts
   useEffect(() => {
     if (!currentUser) return
 
-    const q = query(
+    const postsQuery = query(
       collection(db, 'flyers'),
       where('uploadedBy', '==', currentUser.uid),
       orderBy('uploadedAt', 'desc'),
     )
 
     const unsubscribe = onSnapshot(
-      q,
+      postsQuery,
       (snapshot) => {
-        setFlyerPosts(snapshot.docs.map((d) => ({ id: d.id, _col: 'flyers', ...d.data() })))
-        setLoadingFlyers(false)
+        setPosts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setIsLoadingPosts(false)
       },
       (err) => {
-        console.error('Failed to load flyer posts:', err)
-        setLoadingFlyers(false)
-      },
-    )
-
-    return () => unsubscribe()
-  }, [currentUser])
-
-  // Load this user's status posts
-  useEffect(() => {
-    if (!currentUser) return
-
-    const q = query(
-      collection(db, 'posts'),
-      where('uploadedBy', '==', currentUser.uid),
-      orderBy('uploadedAt', 'desc'),
-    )
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setStatusPosts(snapshot.docs.map((d) => ({ id: d.id, _col: 'posts', ...d.data() })))
-        setLoadingStatus(false)
-      },
-      (err) => {
-        console.error('Failed to load status posts:', err)
-        setLoadingStatus(false)
+        console.error('Failed to load posts:', err)
+        setIsLoadingPosts(false)
       },
     )
 
@@ -267,14 +121,7 @@ export default function Profile() {
     }
   }
 
-  const isLoadingPosts = loadingFlyers || loadingStatus
-  const posts = mergeByDate(flyerPosts, statusPosts)
   const initials = displayName ? displayName[0].toUpperCase() : '?'
-
-  // Derive live post so likes update in real-time without reopening
-  const liveSelectedPost = selectedPost
-    ? posts.find((p) => p.id === selectedPost.id && p._col === selectedPost.col) ?? null
-    : null
 
   return (
     <AppLayout user={currentUser}>
@@ -297,7 +144,7 @@ export default function Profile() {
                 value={draftBio}
                 onChange={(e) => setDraftBio(e.target.value)}
                 placeholder="Tell the scene about yourself..."
-                rows={5}
+                rows={3}
                 maxLength={200}
               />
               <div className="profile-edit-actions">
@@ -332,7 +179,7 @@ export default function Profile() {
                 </button>
               </div>
               {bio
-                ? <p className="profile-bio" style={{ whiteSpace: 'pre-wrap' }}>{bio}</p>
+                ? <p className="profile-bio">{bio}</p>
                 : <p className="profile-bio profile-bio-empty">No bio yet — click Edit profile to add one.</p>
               }
             </>
@@ -347,14 +194,6 @@ export default function Profile() {
               <span className="profile-stat-value">{isLoadingPosts ? '—' : posts.length}</span>
               <span className="profile-stat-label">posts</span>
             </div>
-            {currentUser?.metadata?.creationTime && (
-              <div className="profile-stat">
-                <span className="profile-stat-value">
-                  {new Date(currentUser.metadata.creationTime).getFullYear()}
-                </span>
-                <span className="profile-stat-label">joined</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -381,23 +220,58 @@ export default function Profile() {
       )}
 
       <div className="feed">
-        {posts.map((post) =>
-          post.postType === 'status'
-            ? <StatusPost key={`${post._col}-${post.id}`} post={post} displayName={displayName}
-                onClick={() => setSelectedPost({ id: post.id, col: post._col })} />
-            : <FlyerPost key={`${post._col}-${post.id}`} post={post} displayName={displayName}
-                onClick={() => setSelectedPost({ id: post.id, col: post._col })} />,
-        )}
-      </div>
+        {posts.map((post) => (
+          <article key={post.id} className="feed-post">
+            {post.imageUrl && (
+              <img
+                src={post.imageUrl}
+                alt={post.title ? `${post.title} flyer` : 'Flyer'}
+                className="feed-post-image"
+              />
+            )}
 
-      {liveSelectedPost && (
-        <PostModal
-          post={liveSelectedPost}
-          collection={liveSelectedPost._col}
-          currentUser={currentUser}
-          onClose={() => setSelectedPost(null)}
-        />
-      )}
+            <div className="feed-post-body">
+              <div className="feed-post-header">
+                <div className="feed-post-avatar">{initials}</div>
+                <div>
+                  <div className="feed-post-name">{displayName}</div>
+                  {post.uploadedAt?.toDate && (
+                    <div className="feed-post-date">
+                      {post.uploadedAt.toDate().toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
+
+              <div className="feed-post-meta">
+                {post.date && <span>📅 {post.date}</span>}
+                {post.city && <span>📍 {post.city}</span>}
+                {post.venue && <span>🏛 {post.venue}</span>}
+              </div>
+
+              {Array.isArray(post.genres) && post.genres.length > 0 && (
+                <div className="feed-post-tags">
+                  {post.genres.map((g) => (
+                    <span key={g} className="feed-tag">#{g}</span>
+                  ))}
+                </div>
+              )}
+
+              {Array.isArray(post.djs) && post.djs.length > 0 && (
+                <p className="feed-post-djs">🎧 {post.djs.join(', ')}</p>
+              )}
+
+              {post.description && (
+                <p className="feed-post-desc">{post.description}</p>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
     </AppLayout>
   )
 }

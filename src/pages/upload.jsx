@@ -441,7 +441,6 @@ function validateFlyerForm({ form, imageFile, currentUser }) {
 
 function buildFlyerPayload({ form, currentUser, imageUrl }) {
   return {
-    postType: 'flyer',
     imageUrl,
     uploadedBy: currentUser.uid,
     uploadedByName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver',

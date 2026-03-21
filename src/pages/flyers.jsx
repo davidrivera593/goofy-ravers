@@ -26,10 +26,10 @@ export default function Flyers() {
     const unsubscribe = onSnapshot(
       flyersQuery,
       (snapshot) => {
-        const nextFlyers = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          // Only show flyer-type docs — exclude any legacy status posts
-          .filter((doc) => !doc.postType || doc.postType === 'flyer')
+        const nextFlyers = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
 
         setFlyers(nextFlyers)
         setFlyersError('')
