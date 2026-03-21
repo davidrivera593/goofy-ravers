@@ -61,7 +61,7 @@ const LAYOUT_PRESETS = [
 ]
 
 const SUGGESTIONS = [
-  'What fonts work best for a techno flyer?',
+  'What fonts work best for a happyhardcore flyer?',
   'How do I create a glitch effect in Photopea?',
   'Suggest a color palette for a jungle rave flyer',
   'How do I set up bleed for print in Photopea?',
@@ -315,7 +315,7 @@ export default function Chat() {
             {messages.length === 0 && (
               <div className="chat-empty">
                 <div className="chat-empty-icon">🎨</div>
-                <h2 className="chat-empty-title">Rave Flyer Design Assistant</h2>
+                <h2 className="chat-empty-title">Meet our Goofy Raver bot - tailored for <a href="https://www.photopea.com" target="_blank" rel="noopener noreferrer">PhotoPea</a></h2>
                 <p className="chat-empty-sub">
                   Ask about typography, colors, Photopea techniques — or click a layout on the right to get step-by-step design guidance.
                 </p>
