@@ -7,20 +7,20 @@
   --surface: #161b26;
   --surface2: #1c2333;
   --border: rgba(255,255,255,0.07);
-  --border-bright: rgba(0,245,212,0.3);
+  --border-bright: rgba(245,226,20,0.34);
 
-  --cyan: #00f5d4;
-  --cyan-dim: rgba(0,245,212,0.15);
-  --cyan-glow: rgba(0,245,212,0.08);
-  --magenta: #f500a0;
-  --magenta-dim: rgba(245,0,160,0.15);
-  --amber: #ffb800;
+  --cyan: #f5e214;
+  --cyan-dim: rgba(245,226,20,0.15);
+  --cyan-glow: rgba(245,226,20,0.08);
+  --magenta: #1427f5;
+  --magenta-dim: rgba(20,39,245,0.15);
+  --amber: #f5a214;
 
   --text: #8892a4;
   --text-h: #e8edf5;
   --text-dim: #4a5568;
 
-  --sans: 'Syne', sans-serif;
+  --sans: 'Nunito', sans-serif;
   --mono: 'Space Mono', monospace;
 
   font-family: var(--sans);
@@ -70,8 +70,8 @@ h1, h2, h3 {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(0,245,212,0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(245,0,160,0.05) 0%, transparent 70%);
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(245,226,20,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(20,39,245,0.05) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -79,9 +79,11 @@ h1, h2, h3 {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0,245,212,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,245,212,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+    linear-gradient(rgba(245,226,20,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,226,20,0.03) 1px, transparent 1px),
+    radial-gradient(rgba(245,226,20,0.16) 0.8px, transparent 2px);
+  background-size: 60px 60px, 60px 60px, 6px 6px;
+  background-position: 0 0, 0 0, 1px 1px;
   pointer-events: none;
   mask-image: radial-gradient(ellipse at center, black 20%, transparent 80%);
 }
@@ -96,7 +98,7 @@ h1, h2, h3 {
   position: relative;
   z-index: 1;
   box-shadow:
-    0 0 0 1px rgba(0,245,212,0.05),
+    0 0 0 1px rgba(245,226,20,0.05),
     0 24px 64px rgba(0,0,0,0.6),
     inset 0 1px 0 rgba(255,255,255,0.05);
 }
@@ -187,7 +189,9 @@ h1, h2, h3 {
 
 .auth-form input:focus {
   border-color: var(--border-bright);
-  box-shadow: 0 0 0 3px var(--cyan-glow);
+  box-shadow: none;
+  background-image: radial-gradient(rgba(245,226,20,0.14) 0.7px, transparent 0.8px);
+  background-size: 6px 6px;
 }
 
 .auth-form input::placeholder {
@@ -211,7 +215,9 @@ h1, h2, h3 {
 
 .btn-primary:hover {
   opacity: 0.9;
-  box-shadow: 0 0 20px rgba(0,245,212,0.3);
+  box-shadow: none;
+  background-image: radial-gradient(rgba(8,10,15,0.22) 0.8px, transparent 0.9px);
+  background-size: 5px 5px;
 }
 
 .btn-primary:active { transform: scale(0.99); }
@@ -236,7 +242,9 @@ h1, h2, h3 {
 
 .btn-secondary:hover {
   border-color: var(--border-bright);
-  background: var(--cyan-glow);
+  background-color: rgba(245,226,20,0.08);
+  background-image: radial-gradient(rgba(245,226,20,0.25) 0.8px, transparent 0.9px);
+  background-size: 5px 5px;
 }
 
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -429,9 +437,48 @@ h1, h2, h3 {
   margin-bottom: 40px;
 }
 
+.dashboard-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .dashboard-header h1 {
   font-size: 36px;
   margin-bottom: 6px;
+}
+
+.upload-flyer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border-bright);
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.upload-flyer-btn:hover {
+  border-color: var(--cyan);
+  transform: translateY(-1px);
+  box-shadow: none;
+  background-color: rgba(245,226,20,0.14);
+  background-image: radial-gradient(rgba(245,226,20,0.33) 0.8px, transparent 0.9px);
+  background-size: 5px 5px;
+}
+
+.upload-flyer-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .dashboard-header p {
@@ -477,7 +524,7 @@ h1, h2, h3 {
 }
 
 .dash-card:hover {
-  border-color: rgba(0,245,212,0.2);
+  border-color: rgba(245,226,20,0.2);
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
@@ -518,6 +565,218 @@ h1, h2, h3 {
 .dash-card:hover .dash-card-arrow {
   color: var(--cyan);
   transform: translateX(4px);
+}
+
+.flyers-status {
+  margin-bottom: 16px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.flyers-status-error {
+  color: var(--magenta);
+}
+
+.flyer-card {
+  padding: 0;
+  gap: 0;
+  cursor: pointer;
+}
+
+.flyer-card-empty {
+  padding: 24px;
+  gap: 12px;
+}
+
+.flyer-card-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.flyer-card-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flyer-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+}
+
+.flyer-meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.flyer-detail-modal {
+  width: min(100%, 1040px);
+  max-height: calc(100svh - 32px);
+  display: grid;
+  grid-template-columns: minmax(320px, 1.05fr) minmax(280px, 0.95fr);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+}
+
+.flyer-detail-media-wrap {
+  background: var(--bg2);
+  min-height: 320px;
+}
+
+.flyer-detail-image {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100svh - 32px);
+  object-fit: contain;
+  display: block;
+  background: var(--bg2);
+}
+
+.flyer-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.flyer-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.flyer-detail-title {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.flyer-detail-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.flyer-detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.flyer-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.flyer-detail-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 15, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 16px;
+}
+
+.upload-modal {
+  width: 100%;
+  max-width: 500px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+}
+
+.upload-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.upload-modal-head h2 {
+  font-size: 22px;
+}
+
+.upload-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-h);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.upload-modal-sub {
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.upload-file-label {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.upload-file-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg2);
+  color: var(--text-h);
+}
+
+.upload-file-name {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--cyan);
+}
+
+.upload-modal-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .section-label {
@@ -565,4 +824,17 @@ h1, h2, h3 {
   .nav-links { display: none; }
   .dashboard-body { padding: 24px 16px; }
   .auth-card { padding: 28px 24px; }
+  .dashboard-header-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .flyer-detail-modal {
+    grid-template-columns: 1fr;
+  }
+  .flyer-detail-media-wrap {
+    min-height: 220px;
+  }
+  .flyer-detail-image {
+    max-height: 48svh;
+  }
 }
