@@ -26,6 +26,20 @@ function mergeByDate(a, b) {
   })
 }
 
+function extractYouTubeId(url) {
+  if (!url) return null
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 function getCountdownLabel(dateStr) {
   if (!dateStr) return null
   const eventDate = new Date(dateStr + 'T23:59:59')
@@ -128,12 +142,22 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
     : post.text
+  const ytVideoId = extractYouTubeId(post.youtubeUrl)
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
         <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
         {post.imageUrl && (
           <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
+        )}
+        {!post.imageUrl && ytVideoId && (
+          <div className="feed-post-youtube-thumb">
+            <img
+              src={`https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg`}
+              alt="YouTube video thumbnail"
+            />
+            <div className="feed-post-youtube-play">▶</div>
+          </div>
         )}
         <div className="feed-post-status-text-wrap feed-post-status-collapsed">
           <p className="feed-post-status-text">{displayText}</p>

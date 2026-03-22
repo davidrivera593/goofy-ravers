@@ -15,6 +15,20 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
+function extractYouTubeId(url) {
+  if (!url) return null
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
   const navigate = useNavigate()
   const [comments, setComments] = useState([])
@@ -118,7 +132,8 @@ export default function PostModal({ post, collection: colName, currentUser, avat
 
   const posterName = post.uploadedByName || 'Raver'
   const posterAvatar = post.uploadedByAvatar || avatarCache[post.uploadedBy] || ''
-  const hasImage = Boolean(post.imageUrl)
+  const ytVideoId = extractYouTubeId(post.youtubeUrl)
+  const hasImage = Boolean(post.imageUrl) || Boolean(ytVideoId)
 
   const rightPanel = (
     <div className="post-modal-right">
@@ -298,11 +313,17 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       >
         {hasImage && (
           <div className="post-modal-left">
-            <img
-              src={post.imageUrl}
-              alt={post.title || 'Post image'}
-              className="post-modal-image"
-            />
+            {post.imageUrl
+              ? <img src={post.imageUrl} alt={post.title || 'Post image'} className="post-modal-image" />
+              : <div className="post-modal-youtube">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${ytVideoId}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="YouTube video"
+                  />
+                </div>
+            }
           </div>
         )}
         {rightPanel}

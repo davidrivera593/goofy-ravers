@@ -30,6 +30,20 @@ function mergeByDate(a, b) {
   })
 }
 
+function extractYouTubeId(url) {
+  if (!url) return null
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 function getCountdownLabel(dateStr) {
   if (!dateStr) return null
   const eventDate = new Date(dateStr + 'T23:59:59')
@@ -134,12 +148,22 @@ function StatusPost({ post, onClick, avatarCache }) {
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
     : post.text
+  const ytVideoId = extractYouTubeId(post.youtubeUrl)
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
         <PostHeader post={post} avatarCache={avatarCache} />
         {post.imageUrl && (
           <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
+        )}
+        {!post.imageUrl && ytVideoId && (
+          <div className="feed-post-youtube-thumb">
+            <img
+              src={`https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg`}
+              alt="YouTube video thumbnail"
+            />
+            <div className="feed-post-youtube-play">▶</div>
+          </div>
         )}
         <div className="feed-post-status-text-wrap feed-post-status-collapsed">
           <p className="feed-post-status-text">{displayText}</p>
@@ -163,6 +187,7 @@ function StatusComposer({ currentUser, avatarCache }) {
   const [imagePreview, setImagePreview] = useState(null)
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState('')
+  const [youtubeUrl, setYoutubeUrl] = useState('')
 
   const displayName =
     currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
@@ -195,11 +220,12 @@ function StatusComposer({ currentUser, avatarCache }) {
     setExpanded(false)
     setText('')
     setError('')
+    setYoutubeUrl('')
     handleRemoveImage()
   }
 
   async function handlePost() {
-    if (!text.trim() && !imageFile) return
+    if (!text.trim() && !imageFile && !youtubeUrl.trim()) return
     setPosting(true)
     setError('')
     try {
@@ -224,6 +250,7 @@ function StatusComposer({ currentUser, avatarCache }) {
         postType: 'status',
         text: text.trim(),
         imageUrl,
+        youtubeUrl: youtubeUrl.trim(),
         uploadedBy: currentUser.uid,
         uploadedByName: displayName,
         uploadedByAvatar: avatarUrl,
@@ -232,6 +259,7 @@ function StatusComposer({ currentUser, avatarCache }) {
         commentCount: 0,
       })
       setText('')
+      setYoutubeUrl('')
       handleRemoveImage()
       setExpanded(false)
     } catch (err) {
@@ -305,6 +333,33 @@ function StatusComposer({ currentUser, avatarCache }) {
       )}
 
       {error && <p className="feed-compose-error">{error}</p>}
+
+      {/* YouTube URL */}
+      <div className="feed-compose-youtube">
+        <input
+          className="feed-compose-youtube-input"
+          type="url"
+          placeholder="🎬 Paste a YouTube link (optional)"
+          value={youtubeUrl}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
+          disabled={posting}
+        />
+        {youtubeUrl && extractYouTubeId(youtubeUrl) && (
+          <div className="feed-compose-youtube-preview">
+            <img
+              src={`https://img.youtube.com/vi/${extractYouTubeId(youtubeUrl)}/mqdefault.jpg`}
+              alt="Video preview"
+            />
+            <button
+              type="button"
+              className="feed-compose-youtube-remove"
+              onClick={() => setYoutubeUrl('')}
+              aria-label="Remove YouTube link"
+            >✕</button>
+          </div>
+        )}
+      </div>
+
       <div className="feed-compose-actions">
         <div className="feed-compose-actions-left">
           <button
@@ -343,7 +398,7 @@ function StatusComposer({ currentUser, avatarCache }) {
             type="button"
             className="btn-primary"
             onClick={handlePost}
-            disabled={posting || (!text.trim() && !imageFile)}
+            disabled={posting || (!text.trim() && !imageFile && !youtubeUrl.trim())}
           >
             {posting ? 'Posting…' : 'Post'}
           </button>
