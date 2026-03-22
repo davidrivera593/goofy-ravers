@@ -101,7 +101,7 @@ function FlyerPost({ post, onClick, name, avatar }) {
       )}
       <div className="feed-post-body">
         <PostHeader post={post} name={name} avatar={avatar} />
-        <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
+        <h2 className="feed-post-title">{post.title}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
           {post.city && <span>📍 {post.city}</span>}
