@@ -541,7 +541,7 @@ export default function Profile() {
       </div>
 
       {/* ── Personal posts ── */}
-      <div className="dashboard-header-top" style={{ marginTop: '40px' }}>
+      <div className="dashboard-header-top" style={{ marginTop: '56px', marginBottom: '20px', paddingTop: '24px' }}>
         <p className="section-label" style={{ margin: 0 }}>Your posts</p>
       </div>
 

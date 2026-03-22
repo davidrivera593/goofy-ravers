@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { label: 'Flyers', path: '/flyers' },
   { label: 'Calendar', path: '/calendar' },
   { label: 'Map', path: '/map' },
+  { label: 'Upload flyer', path: '/upload' },
 ]
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
