@@ -2271,6 +2271,72 @@ a.post-modal-name-link:hover {
   background: var(--cyan-dim);
 }
 
+/* Delete button — owner only */
+.post-modal-delete-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  padding: 5px 12px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.post-modal-delete-btn:hover {
+  color: #e0405a;
+  border-color: #e0405a;
+  background: rgba(224, 64, 90, 0.1);
+}
+
+/* Delete confirmation inline */
+.post-modal-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.post-modal-delete-confirm-text {
+  font-size: 13px;
+  font-family: var(--mono);
+  color: #e0405a;
+}
+.post-modal-delete-yes {
+  background: #e0405a;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+.post-modal-delete-yes:hover { opacity: 0.85; }
+.post-modal-delete-yes:disabled { opacity: 0.5; cursor: default; }
+.post-modal-delete-no {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  line-height: 1;
+}
+.post-modal-delete-no:hover {
+  border-color: var(--border-bright);
+  color: var(--text-h);
+}
+.post-modal-delete-no:disabled { opacity: 0.5; cursor: default; }
+
 /* Inline edit (status posts) */
 .post-modal-inline-edit {
   display: flex;

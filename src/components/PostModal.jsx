@@ -5,7 +5,9 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
+  getDocs,
   increment,
   onSnapshot,
   orderBy,
@@ -13,7 +15,8 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import { deleteObject, ref as storageRef } from 'firebase/storage'
+import { db, storage } from '../firebase/config'
 
 function extractYouTubeId(url) {
   if (!url) return null
@@ -37,6 +40,8 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState('')
   const [displayText, setDisplayText] = useState(post.text || '')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const inputRef = useRef(null)
 
   const liked = currentUser && Array.isArray(post.likes) && post.likes.includes(currentUser.uid)
@@ -127,6 +132,35 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       setIsEditing(false)
     } catch (err) {
       console.error('Edit failed:', err)
+    }
+  }
+
+  async function handleDelete() {
+    if (!currentUser || currentUser.uid !== post.uploadedBy) return
+    setDeleting(true)
+    try {
+      // Delete all comments in the subcollection
+      const commentsSnap = await getDocs(collection(db, colName, post.id, 'comments'))
+      const deletePromises = commentsSnap.docs.map((d) => deleteDoc(d.ref))
+      await Promise.all(deletePromises)
+
+      // Try to delete the image from Storage if it exists
+      if (post.imageUrl) {
+        try {
+          const imageRef = storageRef(storage, post.imageUrl)
+          await deleteObject(imageRef)
+        } catch {
+          // Image may not exist in storage or URL format may differ — ignore
+        }
+      }
+
+      // Delete the post document
+      await deleteDoc(doc(db, colName, post.id))
+      onClose()
+    } catch (err) {
+      console.error('Delete failed:', err)
+      setDeleting(false)
+      setConfirmDelete(false)
     }
   }
 
@@ -230,21 +264,50 @@ export default function PostModal({ post, collection: colName, currentUser, avat
           </button>
         )}
         {currentUser?.uid === post.uploadedBy && (
-          <button
-            className="post-modal-edit-btn"
-            onClick={() => {
-              if (isFlyer) {
-                onClose()
-                navigate(`/upload?edit=${post.id}`)
-              } else {
-                setEditText(post.text || '')
-                setIsEditing(true)
-              }
-            }}
-            aria-label="Edit"
-          >
-            ✏ Edit
-          </button>
+          <>
+            <button
+              className="post-modal-edit-btn"
+              onClick={() => {
+                if (isFlyer) {
+                  onClose()
+                  navigate(`/upload?edit=${post.id}`)
+                } else {
+                  setEditText(post.text || '')
+                  setIsEditing(true)
+                }
+              }}
+              aria-label="Edit"
+            >
+              ✏ Edit
+            </button>
+            {confirmDelete ? (
+              <div className="post-modal-delete-confirm">
+                <span className="post-modal-delete-confirm-text">Delete this post?</span>
+                <button
+                  className="post-modal-delete-yes"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  className="post-modal-delete-no"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                className="post-modal-delete-btn"
+                onClick={() => setConfirmDelete(true)}
+                aria-label="Delete"
+              >
+                🗑 Delete
+              </button>
+            )}
+          </>
         )}
       </div>
 
