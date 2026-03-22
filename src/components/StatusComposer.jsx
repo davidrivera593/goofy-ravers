@@ -4,7 +4,7 @@ import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/fires
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
-const MAX_POST_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
+const MAX_POST_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
 
 function extractYouTubeId(url) {
   if (!url) return null
@@ -59,7 +59,7 @@ export default function StatusComposer({
       return
     }
     if (file.size > MAX_POST_IMAGE_SIZE) {
-      setError('Image must be 5 MB or smaller.')
+      setError('Image must be 10 MB or smaller.')
       return
     }
     setError('')

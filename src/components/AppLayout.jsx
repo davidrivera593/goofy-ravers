@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { label: 'Calendar', path: '/calendar' },
   { label: 'Map', path: '/map' },
   { label: 'GARB (our design bot)', path: '/chat' },
+  { label: 'Upload flyer', path: '/upload' },
 ]
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
