@@ -4,6 +4,10 @@ A community platform for the Arizona underground rave and electronic music scene
 
 Built for the hackathon by **Team Goofy Goners**.
 
+## Demo
+
+[![Goofy Ravers Demo](https://img.youtube.com/vi/onuT4owwBTg/maxresdefault.jpg)](https://youtu.be/onuT4owwBTg)
+
 ## Features
 
 ### AI-Powered Flyer Upload
