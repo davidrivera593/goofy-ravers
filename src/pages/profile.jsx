@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
@@ -306,16 +307,28 @@ export default function Profile() {
         return
       }
 
+      const newName = draftName.trim()
+
       await setDoc(
         doc(db, 'users', currentUser.uid),
         {
-          displayName: draftName.trim(),
+          displayName: newName,
           bio: draftBio.trim(),
           favoriteTrackUrl: cleanedTrackUrl,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
       )
+
+      // Propagate new name to all existing posts and flyers
+      if (newName !== displayName) {
+        const batch = writeBatch(db)
+        ;[...flyers, ...statusPosts].forEach((post) => {
+          batch.update(doc(db, post._col, post.id), { uploadedByName: newName })
+        })
+        await batch.commit()
+      }
+
       setIsEditing(false)
       setSaveMsg('Profile saved.')
     } catch (err) {
