@@ -16,6 +16,10 @@ import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 
+/**
+ * TODO: add upcoming events sidebar or above/below feed with calendar view and list view
+ */
+
 const STATUS_COLLAPSE_CHARS = 180
 
 function mergeByDate(a, b) {

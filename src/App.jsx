@@ -8,6 +8,7 @@ import Upload from './pages/upload'
 import Profile from './pages/profile'
 import Chat from './pages/chat'
 import MapPage from './pages/map'
+import Calendar from './pages/calendar'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -84,6 +85,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MapPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Calendar />
             </ProtectedRoute>
           }
         />
