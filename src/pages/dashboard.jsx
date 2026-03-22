@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
   addDoc,
@@ -70,7 +70,10 @@ function PostHeader({ post, avatarCache }) {
         }
       </div>
       <div>
-        <div className="feed-post-name">{posterName}</div>
+        {post.uploadedBy
+          ? <Link to={`/profile/${post.uploadedBy}`} className="feed-post-name feed-post-name-link" onClick={e => e.stopPropagation()}>{posterName}</Link>
+          : <div className="feed-post-name">{posterName}</div>
+        }
         {post.uploadedAt?.toDate && (
           <div className="feed-post-date">
             {post.uploadedAt.toDate().toLocaleDateString('en-US', {

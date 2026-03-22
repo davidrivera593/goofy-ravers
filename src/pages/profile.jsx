@@ -213,7 +213,6 @@ export default function Profile() {
     const q = query(
       collection(db, 'posts'),
       where('uploadedBy', '==', currentUser.uid),
-      orderBy('uploadedAt', 'desc'),
     )
     return onSnapshot(q, (snap) => {
       setStatusPosts(snap.docs.map((d) => ({ id: d.id, _col: 'posts', ...d.data() })))
