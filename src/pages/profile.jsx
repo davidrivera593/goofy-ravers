@@ -15,6 +15,7 @@ import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage
 import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
+import StatusComposer from '../components/StatusComposer'
 
 const STATUS_COLLAPSE_CHARS = 180
 
@@ -176,6 +177,7 @@ export default function Profile() {
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [favoriteTrackUrl, setFavoriteTrackUrl] = useState('')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -183,11 +185,14 @@ export default function Profile() {
 
   const [draftName, setDraftName] = useState('')
   const [draftBio, setDraftBio] = useState('')
+  const [draftFavoriteTrackUrl, setDraftFavoriteTrackUrl] = useState('')
+  const [trackSearch, setTrackSearch] = useState('')
 
   const [flyers, setFlyers] = useState([])
   const [statusPosts, setStatusPosts] = useState([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
+  const [composeOpen, setComposeOpen] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -206,10 +211,12 @@ export default function Profile() {
         setDisplayName(data.displayName || currentUser.email?.split('@')[0] || 'Raver')
         setBio(data.bio || '')
         setAvatarUrl(data.avatarUrl || '')
+        setFavoriteTrackUrl(data.favoriteTrackUrl || '')
       } else {
         setDisplayName(currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver')
         setBio('')
         setAvatarUrl('')
+        setFavoriteTrackUrl('')
       }
     })
   }, [currentUser])
@@ -254,6 +261,8 @@ export default function Profile() {
   function handleEditStart() {
     setDraftName(displayName)
     setDraftBio(bio)
+    setDraftFavoriteTrackUrl(favoriteTrackUrl)
+    setTrackSearch('')
     setIsEditing(true)
     setSaveMsg('')
   }
@@ -263,14 +272,48 @@ export default function Profile() {
     setSaveMsg('')
   }
 
+  function isSoundCloudUrl(url) {
+    if (!url) return false
+    try {
+      const u = new URL(url)
+      const h = u.hostname.toLowerCase()
+      return (
+        h === 'soundcloud.com' ||
+        h.endsWith('.soundcloud.com') ||
+        h === 'on.soundcloud.com' ||
+        h === 'm.soundcloud.com'
+      )
+    } catch {
+      return false
+    }
+  }
+
+  function getSoundCloudPlayerSrc(trackUrl) {
+    if (!trackUrl || !isSoundCloudUrl(trackUrl)) return ''
+    const url = encodeURIComponent(trackUrl)
+    return `https://w.soundcloud.com/player/?url=${url}&color=%23f5e214&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false`
+  }
+
   async function handleSave() {
     if (!currentUser || !draftName.trim()) return
     setIsSaving(true)
     setSaveMsg('')
     try {
+      const cleanedTrackUrl = draftFavoriteTrackUrl.trim()
+      if (cleanedTrackUrl && !isSoundCloudUrl(cleanedTrackUrl)) {
+        setSaveMsg('Please paste a valid SoundCloud track URL.')
+        setIsSaving(false)
+        return
+      }
+
       await setDoc(
         doc(db, 'users', currentUser.uid),
-        { displayName: draftName.trim(), bio: draftBio.trim(), updatedAt: serverTimestamp() },
+        {
+          displayName: draftName.trim(),
+          bio: draftBio.trim(),
+          favoriteTrackUrl: cleanedTrackUrl,
+          updatedAt: serverTimestamp(),
+        },
         { merge: true },
       )
       setIsEditing(false)
@@ -316,6 +359,10 @@ export default function Profile() {
     ? new Date(currentUser.metadata.creationTime).getFullYear()
     : null
 
+  const playerSrc = getSoundCloudPlayerSrc(
+    isEditing ? draftFavoriteTrackUrl.trim() : favoriteTrackUrl.trim(),
+  )
+
   return (
     <AppLayout user={currentUser}>
       {/* ── Profile header ── */}
@@ -354,6 +401,57 @@ export default function Profile() {
                 rows={5}
                 maxLength={500}
               />
+
+              <div className="profile-track-edit">
+                <label className="profile-track-label" htmlFor="favoriteTrackUrl">
+                  Favorite SoundCloud track
+                </label>
+                <input
+                  id="favoriteTrackUrl"
+                  className="profile-track-input"
+                  value={draftFavoriteTrackUrl}
+                  onChange={(e) => setDraftFavoriteTrackUrl(e.target.value)}
+                  placeholder="Paste a SoundCloud track URL"
+                  disabled={isSaving}
+                />
+
+                <div className="profile-track-search">
+                  <input
+                    className="profile-track-search-input"
+                    value={trackSearch}
+                    onChange={(e) => setTrackSearch(e.target.value)}
+                    placeholder="Search SoundCloud (opens new tab)"
+                    disabled={isSaving}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      const q = encodeURIComponent(trackSearch.trim() || draftName.trim() || displayName)
+                      window.open(`https://soundcloud.com/search/sounds?q=${q}`, '_blank', 'noreferrer')
+                    }}
+                    disabled={isSaving}
+                  >
+                    Search
+                  </button>
+                </div>
+
+                {playerSrc && (
+                  <div className="profile-track-embed">
+                    <iframe
+                      title="SoundCloud player preview"
+                      width="100%"
+                      height="166"
+                      scrolling="no"
+                      frameBorder="no"
+                      allow="autoplay"
+                      loading="lazy"
+                      src={playerSrc}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="profile-edit-actions">
                 <button
                   type="button"
@@ -389,6 +487,26 @@ export default function Profile() {
                 ? <p className="profile-bio" style={{ whiteSpace: 'pre-wrap' }}>{bio}</p>
                 : <p className="profile-bio profile-bio-empty">No bio yet — click Edit profile to add one.</p>
               }
+
+              {playerSrc && (
+                <div className="profile-track-view">
+                  <p className="section-label" style={{ margin: '10px 0 8px' }}>
+                    Favorite track
+                  </p>
+                  <div className="profile-track-embed">
+                    <iframe
+                      title="SoundCloud player"
+                      width="100%"
+                      height="166"
+                      scrolling="no"
+                      frameBorder="no"
+                      allow="autoplay"
+                      loading="lazy"
+                      src={playerSrc}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -410,7 +528,28 @@ export default function Profile() {
       </div>
 
       {/* ── Personal posts ── */}
-      <p className="section-label" style={{ marginTop: '40px' }}>Your posts</p>
+      <div className="dashboard-header-top" style={{ marginTop: '40px' }}>
+        <p className="section-label" style={{ margin: 0 }}>Your posts</p>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setComposeOpen(true)}
+          disabled={!currentUser}
+        >
+          + Create post
+        </button>
+      </div>
+
+      {currentUser && (
+        <StatusComposer
+          currentUser={currentUser}
+          myAvatarUrl={avatarUrl}
+          forceExpand={composeOpen}
+          onExpandedChange={(open) => {
+            if (!open) setComposeOpen(false)
+          }}
+        />
+      )}
 
       {isLoadingPosts && <p className="flyers-status">Loading your posts...</p>}
 
