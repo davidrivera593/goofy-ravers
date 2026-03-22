@@ -98,7 +98,7 @@ function EventCard({ flyer, onClick }) {
         <span className="cal-card-date">{formatEventDate(flyer.date)}</span>
 
         <div className="cal-card-info">
-          <h3 className="cal-card-title">{flyer.title || 'Untitled event'}</h3>
+          <h3 className="cal-card-title">{flyer.title}</h3>
           <div className="cal-card-meta">
             {flyer.venue && <span>🏛 {flyer.venue}</span>}
             {flyer.city  && <span>📍 {flyer.city}</span>}
