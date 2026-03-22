@@ -1761,6 +1761,94 @@ h1, h2, h3 {
   opacity: 0.4;
 }
 
+/* Edit button — owner only */
+.post-modal-edit-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  padding: 5px 12px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.post-modal-edit-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+/* Inline edit (status posts) */
+.post-modal-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.post-modal-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  color: var(--text-h);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.post-modal-edit-textarea:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+.post-modal-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.post-modal-edit-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.post-modal-edit-cancel:hover {
+  border-color: var(--border-bright);
+  color: var(--text-h);
+}
+
+.post-modal-edit-save {
+  background: var(--cyan-dim);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.post-modal-edit-save:hover { background: var(--surface2); }
+.post-modal-edit-save:disabled { opacity: 0.4; cursor: default; }
+
 /* Comments list */
 .post-modal-comments {
   flex: 1;

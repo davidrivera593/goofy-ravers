@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
@@ -23,6 +23,8 @@ const EMPTY_FORM = {
 
 export default function Upload() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editId = searchParams.get('edit') // null = create, string = edit existing
   const fileInputRef = useRef(null)
 
   const [currentUser, setCurrentUser] = useState(null)
@@ -38,6 +40,25 @@ export default function Upload() {
     const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user))
     return () => unsubscribe()
   }, [])
+
+  // ── Load existing flyer when editing ──────────────────────────────
+  useEffect(() => {
+    if (!editId) return
+    getDoc(doc(db, 'flyers', editId)).then(snap => {
+      if (!snap.exists()) return
+      const d = snap.data()
+      setForm({
+        title: d.title || '',
+        date: d.date || '',
+        venue: d.venue || '',
+        city: d.city || '',
+        genres: Array.isArray(d.genres) ? d.genres.join(', ') : (d.genres || ''),
+        djs: Array.isArray(d.djs) ? d.djs.join(', ') : (d.djs || ''),
+        description: d.description || '',
+      })
+      if (d.imageUrl) setImagePreview(d.imageUrl)
+    }).catch(err => console.error('Failed to load flyer for edit:', err))
+  }, [editId])
 
   function handleFile(file) {
     if (!file) return
@@ -133,7 +154,7 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
   async function handleSubmit(e) {
     e.preventDefault()
 
-    const validationError = validateFlyerForm({ form, imageFile, currentUser })
+    const validationError = validateFlyerForm({ form, imageFile, currentUser, editMode: Boolean(editId) })
     if (validationError) {
       setErrorMsg(validationError)
       setStatus('error')
@@ -145,52 +166,48 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
       setStatus('uploading')
       setUploadProgress(0)
 
-      // 1. Upload image to Firebase Storage
-      const storageRef = ref(storage, `flyers/${currentUser.uid}/${Date.now()}_${imageFile.name}`)
-      const uploadTask = uploadBytesResumable(storageRef, imageFile)
-
-      const imageUrl = await new Promise((resolve, reject) => {
-        uploadTask.on(
-          'state_changed',
-          (snap) => {
-            setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
-          },
-          reject,
-          async () => {
-            setUploadProgress(100)
-            const url = await getDownloadURL(uploadTask.snapshot.ref)
-            resolve(url)
-          },
-        )
-      })
-
-      // Fetch user avatar to store on the flyer
-      let avatarUrl = ''
-      try {
-        const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
-        if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
-      } catch (_) { /* non-fatal */ }
-
-      const payload = buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl })
-
-      // 2. Write Firestore document with schema and wait for Firebase response
-      const docRef = await addDoc(collection(db, 'flyers'), payload)
-
-      if (!docRef?.id) {
-        throw new Error('Firebase did not return a document id.')
+      // Upload new image if one was selected (optional in edit mode)
+      let newImageUrl = null
+      if (imageFile) {
+        const storageRef = ref(storage, `flyers/${currentUser.uid}/${Date.now()}_${imageFile.name}`)
+        const uploadTask = uploadBytesResumable(storageRef, imageFile)
+        newImageUrl = await new Promise((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snap) => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            reject,
+            async () => {
+              setUploadProgress(100)
+              resolve(await getDownloadURL(uploadTask.snapshot.ref))
+            },
+          )
+        })
       }
 
-      // 3. Verify document exists before routing
-      const savedDoc = await getDoc(doc(db, 'flyers', docRef.id))
-      if (!savedDoc.exists()) {
-        throw new Error('Upload finished but Firestore document was not found.')
+      if (editId) {
+        // ── Edit existing flyer ──────────────────────────────────────
+        await updateDoc(doc(db, 'flyers', editId), buildEditPayload({ form, imageUrl: newImageUrl }))
+      } else {
+        // ── Create new flyer ─────────────────────────────────────────
+        let avatarUrl = ''
+        try {
+          const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
+          if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
+        } catch (_) { /* non-fatal */ }
+
+        const payload = buildFlyerPayload({ form, currentUser, imageUrl: newImageUrl, avatarUrl })
+        const docRef = await addDoc(collection(db, 'flyers'), payload)
+
+        if (!docRef?.id) throw new Error('Firebase did not return a document id.')
+        const savedDoc = await getDoc(doc(db, 'flyers', docRef.id))
+        if (!savedDoc.exists()) throw new Error('Upload finished but Firestore document was not found.')
       }
 
       setStatus('done')
       navigate('/flyers', { replace: true })
     } catch (err) {
       console.error(err)
-      setErrorMsg(err?.message || 'Upload failed. Please try again.')
+      setErrorMsg(err?.message || 'Save failed. Please try again.')
       setStatus('error')
     }
   }
@@ -202,8 +219,8 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
   return (
     <AppLayout
       user={currentUser}
-      title="Upload Flyer"
-      subtitle="Drop your flyer image — Claude will auto-fill the details."
+      title={editId ? 'Edit Flyer' : 'Upload Flyer'}
+      subtitle={editId ? 'Update the event details below.' : 'Drop your flyer image — Claude will auto-fill the details.'}
     >
       <div className="upload-page">
         <form className="upload-form" onSubmit={handleSubmit}>
@@ -275,14 +292,14 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
             </div>
           )}
           {status === 'done' && (
-            <div className="upload-banner done">✓ Uploaded! Redirecting to flyers...</div>
+            <div className="upload-banner done">✓ {editId ? 'Saved!' : 'Uploaded!'} Redirecting...</div>
           )}
           {errorMsg && (
             <div className="upload-banner error">{errorMsg}</div>
           )}
 
           {/* ── Form fields ── */}
-          {imagePreview && (
+          {(imagePreview || editId) && (
             <div className="upload-fields">
               <p className="section-label" style={{ marginBottom: '20px' }}>
                 {status === 'parsing' ? 'Claude is filling these in...' : 'Review & edit details'}
@@ -403,13 +420,15 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
                     status === 'parsing' ||
                     status === 'uploading' ||
                     status === 'done' ||
-                    !imageFile ||
+                    (!editId && !imageFile) ||
                     !form.title.trim() ||
                     !form.date.trim() ||
                     !form.city.trim()
                   }
                 >
-                  {status === 'uploading' ? `Uploading ${uploadProgress}%` : 'Submit flyer'}
+                  {status === 'uploading'
+                    ? (editId ? 'Saving...' : `Uploading ${uploadProgress}%`)
+                    : editId ? 'Save changes' : 'Submit flyer'}
                 </button>
               </div>
             </div>
@@ -430,10 +449,10 @@ function fileToBase64(file) {
   })
 }
 
-function validateFlyerForm({ form, imageFile, currentUser }) {
+function validateFlyerForm({ form, imageFile, currentUser, editMode = false }) {
   if (!currentUser) return 'You must be logged in to upload a flyer.'
-  if (!imageFile) return 'Please select a flyer image first.'
-  if (imageFile.size > MAX_IMAGE_SIZE_BYTES) return 'Image must be 2 MB or smaller.'
+  if (!editMode && !imageFile) return 'Please select a flyer image first.'
+  if (imageFile && imageFile.size > MAX_IMAGE_SIZE_BYTES) return 'Image must be 2 MB or smaller.'
   if (!form.title.trim()) return 'Event title is required.'
   if (!form.date.trim()) return 'Event date is required.'
   if (!form.city.trim()) return 'City is required.'
@@ -444,6 +463,21 @@ function validateFlyerForm({ form, imageFile, currentUser }) {
   }
 
   return ''
+}
+
+function buildEditPayload({ form, imageUrl }) {
+  const payload = {
+    title: form.title.trim(),
+    date: form.date.trim(),
+    venue: form.venue.trim(),
+    city: form.city.trim(),
+    genres: form.genres.split(',').map((g) => g.trim()).filter(Boolean),
+    djs: form.djs.split(',').map((dj) => dj.trim()).filter(Boolean),
+    description: form.description.trim(),
+    updatedAt: serverTimestamp(),
+  }
+  if (imageUrl) payload.imageUrl = imageUrl
+  return payload
 }
 
 function buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl }) {
