@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
-export default function PostModal({ post, collection: colName, currentUser, onClose }) {
+export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -22,6 +22,9 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
 
   const liked = currentUser && Array.isArray(post.likes) && post.likes.includes(currentUser.uid)
   const likeCount = Array.isArray(post.likes) ? post.likes.length : 0
+  const isGoing = currentUser && Array.isArray(post.going) && post.going.includes(currentUser.uid)
+  const goingCount = Array.isArray(post.going) ? post.going.length : 0
+  const isFlyer = post.postType !== 'status'
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -61,6 +64,18 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
     }
   }
 
+  async function handleGoing() {
+    if (!currentUser) return
+    const postRef = doc(db, colName, post.id)
+    try {
+      await updateDoc(postRef, {
+        going: isGoing ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
+      })
+    } catch (err) {
+      console.error('Going toggle failed:', err)
+    }
+  }
+
   async function handleComment(e) {
     e.preventDefault()
     if (!commentText.trim() || !currentUser) return
@@ -73,6 +88,7 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
         text: commentText.trim(),
         authorId: currentUser.uid,
         authorName: posterName,
+        authorAvatar: avatarCache[currentUser.uid] || '',
         createdAt: serverTimestamp(),
       })
       await updateDoc(postDocRef, { commentCount: increment(1) })
@@ -85,6 +101,7 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
   }
 
   const posterName = post.uploadedByName || 'Raver'
+  const posterAvatar = post.uploadedByAvatar || avatarCache[post.uploadedBy] || ''
   const hasImage = Boolean(post.imageUrl)
 
   const rightPanel = (
@@ -93,7 +110,12 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
       <div className="post-modal-content">
         <button className="post-modal-close" onClick={onClose} aria-label="Close">✕</button>
         <div className="post-modal-header">
-          <div className="post-modal-avatar">{posterName[0].toUpperCase()}</div>
+          <div className="post-modal-avatar">
+            {posterAvatar
+              ? <img src={posterAvatar} alt="" className="post-modal-avatar-img" />
+              : posterName[0].toUpperCase()
+            }
+          </div>
           <div>
             <div className="post-modal-name">{posterName}</div>
             {post.uploadedAt?.toDate && (
@@ -131,7 +153,7 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
         )}
       </div>
 
-      {/* Like button */}
+      {/* Actions */}
       <div className="post-modal-actions">
         <button
           className={`post-modal-like-btn${liked ? ' liked' : ''}`}
@@ -142,6 +164,17 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
           {liked ? '♥' : '♡'}
           <span>{likeCount}</span>
         </button>
+        {isFlyer && (
+          <button
+            className={`post-modal-going-btn${isGoing ? ' going' : ''}`}
+            onClick={handleGoing}
+            disabled={!currentUser}
+            aria-label={isGoing ? 'Not going' : "I'm going"}
+          >
+            ✋
+            <span>{goingCount} going</span>
+          </button>
+        )}
       </div>
 
       {/* Comments list */}
@@ -149,24 +182,33 @@ export default function PostModal({ post, collection: colName, currentUser, onCl
         {comments.length === 0 && (
           <p className="post-modal-no-comments">No comments yet. Be the first!</p>
         )}
-        {comments.map((c) => (
+        {comments.map((c) => {
+          const cAvatar = c.authorAvatar || avatarCache[c.authorId] || ''
+          return (
           <div key={c.id} className="post-modal-comment">
             <div className="post-modal-comment-avatar">
-              {(c.authorName || 'R')[0].toUpperCase()}
+              {cAvatar
+                ? <img src={cAvatar} alt="" className="post-modal-comment-avatar-img" />
+                : (c.authorName || 'R')[0].toUpperCase()
+              }
             </div>
             <div className="post-modal-comment-body">
               <span className="post-modal-comment-author">{c.authorName || 'Raver'}</span>
               <p className="post-modal-comment-text">{c.text}</p>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Comment composer */}
       {currentUser && (
         <form className="post-modal-compose" onSubmit={handleComment}>
           <div className="post-modal-compose-avatar">
-            {(currentUser.displayName || currentUser.email || 'R')[0].toUpperCase()}
+            {avatarCache[currentUser.uid]
+              ? <img src={avatarCache[currentUser.uid]} alt="" className="post-modal-comment-avatar-img" />
+              : (currentUser.displayName || currentUser.email || 'R')[0].toUpperCase()
+            }
           </div>
           <input
             ref={inputRef}

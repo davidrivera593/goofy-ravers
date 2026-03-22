@@ -164,7 +164,14 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
         )
       })
 
-      const payload = buildFlyerPayload({ form, currentUser, imageUrl })
+      // Fetch user avatar to store on the flyer
+      let avatarUrl = ''
+      try {
+        const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
+        if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
+      } catch (_) { /* non-fatal */ }
+
+      const payload = buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl })
 
       // 2. Write Firestore document with schema and wait for Firebase response
       const docRef = await addDoc(collection(db, 'flyers'), payload)
@@ -439,11 +446,12 @@ function validateFlyerForm({ form, imageFile, currentUser }) {
   return ''
 }
 
-function buildFlyerPayload({ form, currentUser, imageUrl }) {
+function buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl }) {
   return {
     imageUrl,
     uploadedBy: currentUser.uid,
     uploadedByName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver',
+    uploadedByAvatar: avatarUrl || '',
     uploadedAt: serverTimestamp(),
     title: form.title.trim(),
     date: form.date.trim(),
