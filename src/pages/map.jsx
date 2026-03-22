@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
+  addDoc,
   collection,
   doc,
   onSnapshot,
@@ -32,11 +33,21 @@ export default function MapPage() {
   const [locations, setLocations] = useState([])
   const [flyers, setFlyers] = useState([])
   const [selectedLocation, setSelectedLocation] = useState(null)
+  const [draftPin, setDraftPin] = useState(null)
+  const [pinMode, setPinMode] = useState(false)
+  const [draftForm, setDraftForm] = useState({
+    type: 'spot',
+    name: '',
+    description: '',
+  })
+  const [pinSaving, setPinSaving] = useState(false)
+  const [pinError, setPinError] = useState('')
   const [linkedFlyers, setLinkedFlyers] = useState([])
   const [vibeCheck, setVibeCheck] = useState('')
   const [vibeLoading, setVibeLoading] = useState(false)
   const [viewState, setViewState] = useState(INITIAL_VIEW)
   const [mapReady, setMapReady] = useState(false)
+  const geocodeRequestedRef = useRef(new Set())
 
   // Auth
   useEffect(() => {
@@ -71,13 +82,25 @@ export default function MapPage() {
     )
   }, [])
 
-  // Lazy geocode flyers
+  // Lazy geocode flyers (deduped)
   useEffect(() => {
-    const toGeocode = flyers.filter(
-      (f) => f.venue && f.city && f.city !== 'Other',
-    )
-    for (const flyer of toGeocode) {
-      geocodeVenue(flyer.venue, flyer.city).catch(console.error)
+    const toGeocode = flyers
+      .filter((f) => f.venue && f.city && f.city !== 'Other')
+      .map((f) => ({
+        venue: String(f.venue || '').trim(),
+        city: String(f.city || '').trim(),
+        address: String(f.address || '').trim(),
+      }))
+      .filter((x) => x.venue && x.city)
+
+    for (const item of toGeocode) {
+      const key = `${item.venue.toLowerCase()}|${item.city.toLowerCase()}|${item.address.toLowerCase()}`
+      if (geocodeRequestedRef.current.has(key)) continue
+      geocodeRequestedRef.current.add(key)
+
+      geocodeVenue(item.venue, item.city, { address: item.address }).catch(
+        console.error,
+      )
     }
   }, [flyers])
 
@@ -149,7 +172,107 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
   const handleMarkerClick = useCallback((loc, e) => {
     e.originalEvent?.stopPropagation()
     setSelectedLocation(loc)
+    setDraftPin(null)
+    setPinMode(false)
+    setPinError('')
   }, [])
+
+  function getShiftKey(evt) {
+    return Boolean(evt?.originalEvent?.shiftKey || evt?.srcEvent?.shiftKey)
+  }
+
+  function getLngLat(evt) {
+    const ll = evt?.lngLat
+    if (!ll) return null
+    // react-map-gl / mapbox can provide either an object {lng,lat} or an array [lng,lat]
+    if (Array.isArray(ll) && ll.length === 2) {
+      return { lng: ll[0], lat: ll[1] }
+    }
+    if (typeof ll.lng === 'number' && typeof ll.lat === 'number') {
+      return { lng: ll.lng, lat: ll.lat }
+    }
+    return null
+  }
+
+  const handleMapClick = useCallback(
+    (e) => {
+      // Create pins intentionally: Shift+Click (desktop) or pinMode (mobile)
+      const wantsPin = pinMode || getShiftKey(e)
+      if (!wantsPin) return
+
+      const lngLat = getLngLat(e)
+      if (!lngLat) return
+
+      if (!currentUser) {
+        setPinError('You must be logged in to drop a pin.')
+        return
+      }
+
+      setSelectedLocation(null)
+      setVibeCheck('')
+      setVibeLoading(false)
+      setLinkedFlyers([])
+      setPinError('')
+
+      setDraftPin({ lng: lngLat.lng, lat: lngLat.lat })
+      setDraftForm({ type: 'spot', name: '', description: '' })
+      setPinMode(false)
+    },
+    [currentUser, pinMode],
+  )
+
+  async function saveDraftPin() {
+    if (!currentUser) {
+      setPinError('You must be logged in to drop a pin.')
+      return
+    }
+    if (!draftPin) return
+    if (!draftForm.name.trim()) {
+      setPinError('Name is required.')
+      return
+    }
+
+    setPinSaving(true)
+    setPinError('')
+
+    try {
+      const addedByName =
+        currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver'
+
+      const payload = {
+        lat: draftPin.lat,
+        lng: draftPin.lng,
+        name: draftForm.name.trim(),
+        description: draftForm.description.trim(),
+        type: draftForm.type,
+        addedBy: currentUser.uid,
+        addedByName,
+        geocodeQuery: null,
+        geocodeSource: 'manual',
+        geocodePlaceName: '',
+        linkedCity: null,
+        linkedVenue: null,
+        linkedAddress: null,
+        vibeCheck: null,
+        vibeCheckedAt: null,
+        createdAt: serverTimestamp(),
+      }
+
+      const ref = await addDoc(collection(db, 'locations'), payload)
+      setDraftPin(null)
+      setSelectedLocation({ id: ref.id, ...payload })
+    } catch (err) {
+      console.error('Save pin error:', err)
+      const msg = String(err?.message || '')
+      if (msg.toLowerCase().includes('missing or insufficient permissions')) {
+        setPinError('Firestore rules blocked saving this pin (missing permissions).')
+      } else {
+        setPinError('Could not save pin. Please try again.')
+      }
+    } finally {
+      setPinSaving(false)
+    }
+  }
 
   return (
     <AppLayout
@@ -164,6 +287,7 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
               {...viewState}
               onMove={(evt) => setViewState(evt.viewState)}
               onLoad={() => setMapReady(true)}
+              onClick={handleMapClick}
               mapboxAccessToken={MAPBOX_TOKEN}
               mapStyle={MAP_STYLE}
               style={{ position: 'absolute', inset: 0 }}
@@ -191,11 +315,124 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
                     </div>
                   </Marker>
                 ))}
+
+              {mapReady && draftPin && (
+                <Marker
+                  longitude={draftPin.lng}
+                  latitude={draftPin.lat}
+                  anchor="bottom"
+                  onClick={(e) => e.originalEvent?.stopPropagation()}
+                >
+                  <div
+                    className={`map-marker map-marker-${draftForm.type} map-marker-draft`}
+                    title="New pin"
+                  >
+                    ＋
+                  </div>
+                </Marker>
+              )}
             </MapGL>
           </div>
 
           {/* Side panel */}
-          {selectedLocation && (
+          {draftPin && (
+            <aside className="map-panel">
+              <div className="map-panel-header">
+                <div>
+                  <span
+                    className={`map-panel-type-badge map-panel-type-${draftForm.type}`}
+                  >
+                    new {draftForm.type}
+                  </span>
+                  <h2 className="map-panel-title">Drop a pin</h2>
+                  <p className="map-panel-meta">Shift+Click places it</p>
+                </div>
+                <button
+                  className="map-panel-close"
+                  onClick={() => {
+                    setDraftPin(null)
+                    setPinMode(false)
+                    setPinError('')
+                  }}
+                  aria-label="Close panel"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="map-add-body">
+                {pinError && <p className="map-add-error">{pinError}</p>}
+
+                <div className="map-add-form">
+                  <label>
+                    Type
+                    <select
+                      value={draftForm.type}
+                      onChange={(e) =>
+                        setDraftForm((p) => ({ ...p, type: e.target.value }))
+                      }
+                      disabled={pinSaving}
+                    >
+                      <option value="spot">Spot</option>
+                      <option value="venue">Venue</option>
+                      <option value="event">Event</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Name
+                    <input
+                      type="text"
+                      placeholder="e.g. Warehouse spot"
+                      value={draftForm.name}
+                      onChange={(e) =>
+                        setDraftForm((p) => ({ ...p, name: e.target.value }))
+                      }
+                      disabled={pinSaving}
+                    />
+                  </label>
+
+                  <label>
+                    Notes (optional)
+                    <input
+                      type="text"
+                      placeholder="Cross streets, vibe notes…"
+                      value={draftForm.description}
+                      onChange={(e) =>
+                        setDraftForm((p) => ({ ...p, description: e.target.value }))
+                      }
+                      disabled={pinSaving}
+                    />
+                  </label>
+                </div>
+
+                <div className="map-add-actions">
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => {
+                      setDraftPin(null)
+                      setPinMode(false)
+                      setPinError('')
+                    }}
+                    disabled={pinSaving}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn-primary"
+                    type="button"
+                    onClick={saveDraftPin}
+                    disabled={pinSaving || !draftForm.name.trim()}
+                  >
+                    {pinSaving ? 'Saving…' : 'Save pin'}
+                  </button>
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {selectedLocation && !draftPin && (
             <aside className="map-panel">
               <div className="map-panel-header">
                 <div>
@@ -275,6 +512,19 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
 
         {/* Legend */}
         <div className="map-legend">
+          <button
+            type="button"
+            className={`btn-secondary map-legend-pin-btn${pinMode ? ' active' : ''}`}
+            onClick={() => {
+              setPinError('')
+              setDraftPin(null)
+              setSelectedLocation(null)
+              setPinMode((v) => !v)
+            }}
+          >
+            {pinMode ? 'Tap map to place…' : 'Drop pin'}
+          </button>
+          <span className="map-legend-item">Shift+Click also works</span>
           <span className="map-legend-item">
             <span className="map-legend-dot map-legend-venue">◆</span> Venue
           </span>
