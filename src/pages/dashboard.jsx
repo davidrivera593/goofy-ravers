@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
 } from 'firebase/firestore'
-import { auth, db } from '../firebase/config'
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 
@@ -23,22 +26,45 @@ function mergeByDate(a, b) {
   })
 }
 
+function getCountdownLabel(dateStr) {
+  if (!dateStr) return null
+  const eventDate = new Date(dateStr + 'T23:59:59')
+  const now = new Date()
+  const diffMs = eventDate - now
+  if (diffMs < 0) return null // past event
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'TONIGHT'
+  if (diffDays === 1) return 'TOMORROW'
+  if (diffDays <= 7) return `${diffDays} DAYS AWAY`
+  return null
+}
+
 function CardCounts({ post }) {
   const likeCount = Array.isArray(post.likes) ? post.likes.length : 0
   const commentCount = typeof post.commentCount === 'number' ? post.commentCount : 0
+  const goingCount = Array.isArray(post.going) ? post.going.length : 0
   return (
     <div className="feed-post-counts">
       <span className="feed-post-count">♥ {likeCount}</span>
       <span className="feed-post-count">💬 {commentCount}</span>
+      {post.postType !== 'status' && (
+        <span className="feed-post-count">✋ {goingCount}</span>
+      )}
     </div>
   )
 }
 
-function PostHeader({ post }) {
+function PostHeader({ post, avatarCache }) {
   const posterName = post.uploadedByName || 'Raver'
+  const avatar = post.uploadedByAvatar || (avatarCache && avatarCache[post.uploadedBy]) || ''
   return (
     <div className="feed-post-header">
-      <div className="feed-post-avatar">{posterName[0].toUpperCase()}</div>
+      <div className="feed-post-avatar">
+        {avatar
+          ? <img src={avatar} alt="" className="feed-post-avatar-img" />
+          : posterName[0].toUpperCase()
+        }
+      </div>
       <div>
         <div className="feed-post-name">{posterName}</div>
         {post.uploadedAt?.toDate && (
@@ -53,18 +79,26 @@ function PostHeader({ post }) {
   )
 }
 
-function FlyerPost({ post, onClick }) {
+function FlyerPost({ post, onClick, avatarCache }) {
+  const countdown = getCountdownLabel(post.date)
   return (
     <article className="feed-post feed-post-clickable" onClick={onClick}>
       {post.imageUrl && (
-        <img
-          src={post.imageUrl}
-          alt={post.title ? `${post.title} flyer` : 'Flyer'}
-          className="feed-post-image"
-        />
+        <div className="feed-post-image-wrap">
+          <img
+            src={post.imageUrl}
+            alt={post.title ? `${post.title} flyer` : 'Flyer'}
+            className="feed-post-image"
+          />
+          {countdown && (
+            <span className={`feed-post-countdown${countdown === 'TONIGHT' ? ' tonight' : ''}`}>
+              {countdown}
+            </span>
+          )}
+        </div>
       )}
       <div className="feed-post-body">
-        <PostHeader post={post} />
+        <PostHeader post={post} avatarCache={avatarCache} />
         <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
@@ -88,7 +122,7 @@ function FlyerPost({ post, onClick }) {
   )
 }
 
-function StatusPost({ post, onClick }) {
+function StatusPost({ post, onClick, avatarCache }) {
   const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
@@ -96,7 +130,7 @@ function StatusPost({ post, onClick }) {
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
-        <PostHeader post={post} />
+        <PostHeader post={post} avatarCache={avatarCache} />
         {post.imageUrl && (
           <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
         )}
@@ -111,31 +145,87 @@ function StatusPost({ post, onClick }) {
 }
 
 // ── Status composer ──────────────────────────────────────────────────────────
-function StatusComposer({ currentUser }) {
+const MAX_POST_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
+
+function StatusComposer({ currentUser, avatarCache }) {
   const navigate = useNavigate()
+  const fileInputRef = useRef(null)
   const [expanded, setExpanded] = useState(false)
   const [text, setText] = useState('')
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState('')
 
   const displayName =
     currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
+  const myAvatar = (avatarCache && avatarCache[currentUser?.uid]) || ''
+
+  function handleImageSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed.')
+      return
+    }
+    if (file.size > MAX_POST_IMAGE_SIZE) {
+      setError('Image must be 5 MB or smaller.')
+      return
+    }
+    setError('')
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  function handleRemoveImage() {
+    setImageFile(null)
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleCancel() {
+    setExpanded(false)
+    setText('')
+    setError('')
+    handleRemoveImage()
+  }
 
   async function handlePost() {
-    if (!text.trim()) return
+    if (!text.trim() && !imageFile) return
     setPosting(true)
     setError('')
     try {
+      // Fetch latest avatar URL to store on the post
+      let avatarUrl = myAvatar
+      if (!avatarUrl && currentUser?.uid) {
+        try {
+          const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
+          if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
+        } catch (_) { /* non-fatal */ }
+      }
+
+      // Upload image if attached
+      let imageUrl = ''
+      if (imageFile) {
+        const fileRef = storageRef(storage, `posts/${currentUser.uid}/${Date.now()}_${imageFile.name}`)
+        await uploadBytes(fileRef, imageFile)
+        imageUrl = await getDownloadURL(fileRef)
+      }
+
       await addDoc(collection(db, 'posts'), {
         postType: 'status',
         text: text.trim(),
+        imageUrl,
         uploadedBy: currentUser.uid,
         uploadedByName: displayName,
+        uploadedByAvatar: avatarUrl,
         uploadedAt: serverTimestamp(),
         likes: [],
         commentCount: 0,
       })
       setText('')
+      handleRemoveImage()
       setExpanded(false)
     } catch (err) {
       console.error('Failed to post:', err)
@@ -154,7 +244,12 @@ function StatusComposer({ currentUser }) {
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(true) }}
       >
-        <div className="feed-compose-avatar">{displayName[0].toUpperCase()}</div>
+        <div className="feed-compose-avatar">
+          {myAvatar
+            ? <img src={myAvatar} alt="" className="feed-post-avatar-img" />
+            : displayName[0].toUpperCase()
+          }
+        </div>
         <div className="feed-compose-input">Drop a flyer or share what's happening...</div>
         <button
           type="button"
@@ -170,7 +265,12 @@ function StatusComposer({ currentUser }) {
   return (
     <div className="feed-compose feed-compose-expanded">
       <div className="feed-compose-top">
-        <div className="feed-compose-avatar">{displayName[0].toUpperCase()}</div>
+        <div className="feed-compose-avatar">
+          {myAvatar
+            ? <img src={myAvatar} alt="" className="feed-post-avatar-img" />
+            : displayName[0].toUpperCase()
+          }
+        </div>
         <textarea
           className="feed-compose-textarea"
           placeholder="What's happening in the scene?"
@@ -181,9 +281,41 @@ function StatusComposer({ currentUser }) {
           maxLength={1000}
         />
       </div>
+
+      {/* Image preview */}
+      {imagePreview && (
+        <div className="feed-compose-image-preview">
+          <img src={imagePreview} alt="Attachment preview" />
+          <button
+            type="button"
+            className="feed-compose-image-remove"
+            onClick={handleRemoveImage}
+            aria-label="Remove image"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {error && <p className="feed-compose-error">{error}</p>}
       <div className="feed-compose-actions">
         <div className="feed-compose-actions-left">
+          <button
+            type="button"
+            className="feed-compose-photo-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={posting}
+            title="Add a photo"
+          >
+            📷 Photo
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageSelect}
+          />
           <button
             type="button"
             className="feed-compose-flyer-link"
@@ -196,7 +328,7 @@ function StatusComposer({ currentUser }) {
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => { setExpanded(false); setText(''); setError('') }}
+            onClick={handleCancel}
           >
             Cancel
           </button>
@@ -204,7 +336,7 @@ function StatusComposer({ currentUser }) {
             type="button"
             className="btn-primary"
             onClick={handlePost}
-            disabled={posting || !text.trim()}
+            disabled={posting || (!text.trim() && !imageFile)}
           >
             {posting ? 'Posting…' : 'Post'}
           </button>
@@ -222,12 +354,27 @@ export default function Dashboard() {
   const [statusPosts, setStatusPosts] = useState([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
+  const [avatarCache, setAvatarCache] = useState({}) // uid → avatarUrl
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user)
     })
     return () => unsubscribe()
+  }, [])
+
+  // Listen to all user docs for avatar URLs
+  useEffect(() => {
+    return onSnapshot(collection(db, 'users'), (snap) => {
+      const cache = {}
+      snap.docs.forEach((d) => {
+        const data = d.data()
+        if (data.avatarUrl) cache[d.id] = data.avatarUrl
+      })
+      setAvatarCache(cache)
+    }, (err) => {
+      console.error('Failed to load user avatars:', err)
+    })
   }, [])
 
   // Live feed — flyers collection
@@ -274,7 +421,7 @@ export default function Dashboard() {
         </button>
       }
     >
-      {currentUser && <StatusComposer currentUser={currentUser} />}
+      {currentUser && <StatusComposer currentUser={currentUser} avatarCache={avatarCache} />}
 
       <p className="section-label" style={{ marginTop: '32px' }}>Latest posts</p>
 
@@ -300,8 +447,8 @@ export default function Dashboard() {
         {posts.map((post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
-            ? <StatusPost key={post.id} post={post} onClick={openModal} />
-            : <FlyerPost key={post.id} post={post} onClick={openModal} />
+            ? <StatusPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
+            : <FlyerPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
         })}
       </div>
 
@@ -310,6 +457,7 @@ export default function Dashboard() {
           post={liveSelectedPost}
           collection={liveSelectedPost._col}
           currentUser={currentUser}
+          avatarCache={avatarCache}
           onClose={() => setSelectedPost(null)}
         />
       )}

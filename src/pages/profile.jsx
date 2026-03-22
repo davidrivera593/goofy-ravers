@@ -11,7 +11,8 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore'
-import { auth, db } from '../firebase/config'
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+import { auth, db, storage } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 
@@ -25,23 +26,46 @@ function mergeByDate(a, b) {
   })
 }
 
+function getCountdownLabel(dateStr) {
+  if (!dateStr) return null
+  const eventDate = new Date(dateStr + 'T23:59:59')
+  const now = new Date()
+  const diffMs = eventDate - now
+  if (diffMs < 0) return null
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'TONIGHT'
+  if (diffDays === 1) return 'TOMORROW'
+  if (diffDays <= 7) return `${diffDays} DAYS AWAY`
+  return null
+}
+
 function CardCounts({ post }) {
   const likeCount = Array.isArray(post.likes) ? post.likes.length : 0
   const commentCount = typeof post.commentCount === 'number' ? post.commentCount : 0
+  const goingCount = Array.isArray(post.going) ? post.going.length : 0
   return (
     <div className="feed-post-counts">
       <span className="feed-post-count">♥ {likeCount}</span>
       <span className="feed-post-count">💬 {commentCount}</span>
+      {post.postType !== 'status' && (
+        <span className="feed-post-count">✋ {goingCount}</span>
+      )}
     </div>
   )
 }
 
-function PostHeader({ post, displayName, initials }) {
+function PostHeader({ post, displayName, initials, avatarUrl }) {
   const posterName = displayName || post.uploadedByName || 'Raver'
   const initial = initials || posterName[0].toUpperCase()
+  const avatar = avatarUrl || post.uploadedByAvatar || ''
   return (
     <div className="feed-post-header">
-      <div className="feed-post-avatar">{initial}</div>
+      <div className="feed-post-avatar">
+        {avatar
+          ? <img src={avatar} alt="" className="feed-post-avatar-img" />
+          : initial
+        }
+      </div>
       <div>
         <div className="feed-post-name">{posterName}</div>
         {post.uploadedAt?.toDate && (
@@ -56,18 +80,26 @@ function PostHeader({ post, displayName, initials }) {
   )
 }
 
-function FlyerPost({ post, onClick, displayName, initials }) {
+function FlyerPost({ post, onClick, displayName, initials, avatarUrl }) {
+  const countdown = getCountdownLabel(post.date)
   return (
     <article className="feed-post feed-post-clickable" onClick={onClick}>
       {post.imageUrl && (
-        <img
-          src={post.imageUrl}
-          alt={post.title ? `${post.title} flyer` : 'Flyer'}
-          className="feed-post-image"
-        />
+        <div className="feed-post-image-wrap">
+          <img
+            src={post.imageUrl}
+            alt={post.title ? `${post.title} flyer` : 'Flyer'}
+            className="feed-post-image"
+          />
+          {countdown && (
+            <span className={`feed-post-countdown${countdown === 'TONIGHT' ? ' tonight' : ''}`}>
+              {countdown}
+            </span>
+          )}
+        </div>
       )}
       <div className="feed-post-body">
-        <PostHeader post={post} displayName={displayName} initials={initials} />
+        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
         <h2 className="feed-post-title">{post.title || 'Untitled event'}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
@@ -91,7 +123,7 @@ function FlyerPost({ post, onClick, displayName, initials }) {
   )
 }
 
-function StatusPost({ post, onClick, displayName, initials }) {
+function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
   const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
@@ -99,7 +131,7 @@ function StatusPost({ post, onClick, displayName, initials }) {
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
-        <PostHeader post={post} displayName={displayName} initials={initials} />
+        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
         {post.imageUrl && (
           <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
         )}
@@ -119,6 +151,8 @@ export default function Profile() {
 
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -147,9 +181,11 @@ export default function Profile() {
         const data = snap.data()
         setDisplayName(data.displayName || currentUser.email?.split('@')[0] || 'Raver')
         setBio(data.bio || '')
+        setAvatarUrl(data.avatarUrl || '')
       } else {
         setDisplayName(currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver')
         setBio('')
+        setAvatarUrl('')
       }
     })
   }, [currentUser])
@@ -224,13 +260,59 @@ export default function Profile() {
     }
   }
 
+  async function handleAvatarUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser) return
+    if (!file.type.startsWith('image/')) return
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveMsg('Image too large. Max 5 MB.')
+      return
+    }
+    setAvatarUploading(true)
+    setSaveMsg('')
+    try {
+      const fileRef = storageRef(storage, `avatars/${currentUser.uid}`)
+      await uploadBytes(fileRef, file)
+      const url = await getDownloadURL(fileRef)
+      await setDoc(
+        doc(db, 'users', currentUser.uid),
+        { avatarUrl: url, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+      setSaveMsg('Avatar updated!')
+    } catch (err) {
+      console.error('Avatar upload failed:', err)
+      setSaveMsg('Upload failed. Try again.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
   const initials = displayName ? displayName[0].toUpperCase() : '?'
+  const yearJoined = currentUser?.metadata?.creationTime
+    ? new Date(currentUser.metadata.creationTime).getFullYear()
+    : null
 
   return (
     <AppLayout user={currentUser}>
       {/* ── Profile header ── */}
       <div className="profile-header">
-        <div className="profile-avatar-lg">{initials}</div>
+        <label className="profile-avatar-lg profile-avatar-upload" title="Change avatar">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" />
+            : initials
+          }
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarUpload}
+            disabled={avatarUploading}
+            className="profile-avatar-file-input"
+          />
+          <span className="profile-avatar-overlay">
+            {avatarUploading ? '…' : '📷'}
+          </span>
+        </label>
         <div className="profile-info">
           {isEditing ? (
             <>
@@ -246,8 +328,8 @@ export default function Profile() {
                 value={draftBio}
                 onChange={(e) => setDraftBio(e.target.value)}
                 placeholder="Tell the scene about yourself..."
-                rows={3}
-                maxLength={200}
+                rows={5}
+                maxLength={500}
               />
               <div className="profile-edit-actions">
                 <button
@@ -281,7 +363,7 @@ export default function Profile() {
                 </button>
               </div>
               {bio
-                ? <p className="profile-bio">{bio}</p>
+                ? <p className="profile-bio" style={{ whiteSpace: 'pre-wrap' }}>{bio}</p>
                 : <p className="profile-bio profile-bio-empty">No bio yet — click Edit profile to add one.</p>
               }
             </>
@@ -294,6 +376,12 @@ export default function Profile() {
               <span className="profile-stat-value">{isLoadingPosts ? '—' : posts.length}</span>
               <span className="profile-stat-label">posts</span>
             </div>
+            {yearJoined && (
+              <div className="profile-stat">
+                <span className="profile-stat-value">{yearJoined}</span>
+                <span className="profile-stat-label">joined</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -323,8 +411,8 @@ export default function Profile() {
         {posts.map((post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
-            ? <StatusPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} />
-            : <FlyerPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} />
+            ? <StatusPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
+            : <FlyerPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
         })}
       </div>
 
@@ -333,6 +421,7 @@ export default function Profile() {
           post={liveSelectedPost}
           collection={liveSelectedPost._col}
           currentUser={currentUser}
+          avatarCache={{ [currentUser?.uid]: avatarUrl }}
           onClose={() => setSelectedPost(null)}
         />
       )}

@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { auth, db } from '../firebase/config'
 
 const NAV_LINKS = [
   { label: 'Flyers', path: '/flyers' },
@@ -11,9 +13,20 @@ const NAV_LINKS = [
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
   const navigate = useNavigate()
+  const [avatarUrl, setAvatarUrl] = useState('')
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Raver'
   const initials = displayName[0].toUpperCase()
+
+  // Listen to user doc for avatar
+  useEffect(() => {
+    if (!user?.uid) { setAvatarUrl(''); return }
+    return onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        setAvatarUrl(snap.data().avatarUrl || '')
+      }
+    })
+  }, [user?.uid])
 
   async function handleLogout() {
     await signOut(auth)
@@ -42,7 +55,12 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
 
         <div className="nav-right">
           <button className="nav-user" onClick={() => navigate('/profile')}>
-            <div className="nav-avatar">{initials}</div>
+            <div className="nav-avatar">
+              {avatarUrl
+                ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
+                : initials
+              }
+            </div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>
               {displayName}
             </span>

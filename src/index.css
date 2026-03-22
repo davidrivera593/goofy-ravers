@@ -416,6 +416,14 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   font-family: var(--mono);
+  overflow: hidden;
+}
+
+.nav-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .btn-logout {
@@ -861,6 +869,7 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .feed-compose-input {
@@ -924,12 +933,46 @@ h1, h2, h3 {
   transform: translateY(-2px);
 }
 
+.feed-post-image-wrap {
+  position: relative;
+}
+
 .feed-post-image {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   display: block;
   border-bottom: 1px solid var(--border);
+}
+
+/* ── Countdown badge ── */
+.feed-post-countdown {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(8, 10, 15, 0.82);
+  border: 1px solid var(--border-bright);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 9px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+}
+
+.feed-post-countdown.tonight {
+  background: rgba(224, 64, 90, 0.85);
+  border-color: rgba(224, 64, 90, 0.5);
+  color: #fff;
+  animation: pulse-tonight 1.5s ease infinite;
+}
+
+@keyframes pulse-tonight {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 64, 90, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(224, 64, 90, 0); }
 }
 
 .feed-post-body {
@@ -959,6 +1002,14 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.feed-post-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .feed-post-name {
@@ -1152,6 +1203,47 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-avatar-upload {
+  cursor: pointer;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+.profile-avatar-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.profile-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(8, 10, 15, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.profile-avatar-upload:hover .profile-avatar-overlay {
+  opacity: 1;
 }
 
 .profile-info {
@@ -1361,6 +1453,65 @@ h1, h2, h3 {
   color: var(--magenta);
 }
 
+.feed-compose-image-preview {
+  position: relative;
+  margin: 8px 0 0 46px;
+  max-width: 280px;
+}
+
+.feed-compose-image-preview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.feed-compose-image-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.feed-compose-image-remove:hover {
+  background: rgba(0,0,0,0.9);
+}
+
+.feed-compose-photo-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.feed-compose-photo-btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.feed-compose-photo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Post detail modal ── */
 .post-modal {
   background: var(--surface);
@@ -1453,6 +1604,14 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.post-modal-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .post-modal-name {
@@ -1558,6 +1717,49 @@ h1, h2, h3 {
   opacity: 0.4;
 }
 
+/* Going button */
+.post-modal-going-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: var(--text-dim);
+  padding: 5px 12px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.post-modal-going-btn span {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+
+.post-modal-going-btn:hover {
+  color: var(--cyan);
+  border-color: var(--border-bright);
+  background: var(--cyan-dim);
+}
+
+.post-modal-going-btn.going {
+  color: var(--cyan);
+  border-color: var(--border-bright);
+  background: var(--cyan-dim);
+}
+
+.post-modal-going-btn.going span {
+  color: var(--cyan);
+}
+
+.post-modal-going-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 /* Comments list */
 .post-modal-comments {
   flex: 1;
@@ -1598,6 +1800,14 @@ h1, h2, h3 {
   color: var(--cyan);
   flex-shrink: 0;
   margin-top: 1px;
+  overflow: hidden;
+}
+
+.post-modal-comment-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .post-modal-comment-body {
@@ -1645,6 +1855,7 @@ h1, h2, h3 {
   font-weight: 700;
   color: var(--cyan);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .post-modal-compose-input {
