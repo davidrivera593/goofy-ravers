@@ -1,20 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
-  addDoc,
   collection,
-  doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
 } from 'firebase/firestore'
-import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
-import { auth, db, storage } from '../firebase/config'
+import { auth, db } from '../firebase/config'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
+import StatusComposer from '../components/StatusComposer'
 
 /**
  * TODO: add upcoming events sidebar or above/below feed with calendar view and list view
@@ -151,203 +147,29 @@ function StatusPost({ post, onClick, avatarCache }) {
 // ── Status composer ──────────────────────────────────────────────────────────
 const MAX_POST_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
 
-function StatusComposer({ currentUser, avatarCache }) {
-  const navigate = useNavigate()
-  const fileInputRef = useRef(null)
-  const [expanded, setExpanded] = useState(false)
-  const [text, setText] = useState('')
-  const [imageFile, setImageFile] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [posting, setPosting] = useState(false)
-  const [error, setError] = useState('')
+function normalize(v) {
+  return String(v || '').toLowerCase().trim()
+}
 
-  const displayName =
-    currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Raver'
-  const myAvatar = (avatarCache && avatarCache[currentUser?.uid]) || ''
+function postMatchesQuery(post, q) {
+  const query = normalize(q)
+  if (!query) return true
 
-  function handleImageSelect(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Only image files are allowed.')
-      return
-    }
-    if (file.size > MAX_POST_IMAGE_SIZE) {
-      setError('Image must be 5 MB or smaller.')
-      return
-    }
-    setError('')
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
-  }
+  const chunks = [
+    post.postType,
+    post.uploadedByName,
+    post.title,
+    post.venue,
+    post.city,
+    post.address,
+    post.description,
+    post.text,
+    Array.isArray(post.djs) ? post.djs.join(' ') : '',
+    Array.isArray(post.genres) ? post.genres.join(' ') : '',
+  ]
 
-  function handleRemoveImage() {
-    setImageFile(null)
-    if (imagePreview) URL.revokeObjectURL(imagePreview)
-    setImagePreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  function handleCancel() {
-    setExpanded(false)
-    setText('')
-    setError('')
-    handleRemoveImage()
-  }
-
-  async function handlePost() {
-    if (!text.trim() && !imageFile) return
-    setPosting(true)
-    setError('')
-    try {
-      // Fetch latest avatar URL to store on the post
-      let avatarUrl = myAvatar
-      if (!avatarUrl && currentUser?.uid) {
-        try {
-          const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
-          if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
-        } catch (_) { /* non-fatal */ }
-      }
-
-      // Upload image if attached
-      let imageUrl = ''
-      if (imageFile) {
-        const fileRef = storageRef(storage, `posts/${currentUser.uid}/${Date.now()}_${imageFile.name}`)
-        await uploadBytes(fileRef, imageFile)
-        imageUrl = await getDownloadURL(fileRef)
-      }
-
-      await addDoc(collection(db, 'posts'), {
-        postType: 'status',
-        text: text.trim(),
-        imageUrl,
-        uploadedBy: currentUser.uid,
-        uploadedByName: displayName,
-        uploadedByAvatar: avatarUrl,
-        uploadedAt: serverTimestamp(),
-        likes: [],
-        commentCount: 0,
-      })
-      setText('')
-      handleRemoveImage()
-      setExpanded(false)
-    } catch (err) {
-      console.error('Failed to post:', err)
-      setError('Could not post. Try again.')
-    } finally {
-      setPosting(false)
-    }
-  }
-
-  if (!expanded) {
-    return (
-      <div
-        className="feed-compose"
-        onClick={() => setExpanded(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(true) }}
-      >
-        <div className="feed-compose-avatar">
-          {myAvatar
-            ? <img src={myAvatar} alt="" className="feed-post-avatar-img" />
-            : displayName[0].toUpperCase()
-          }
-        </div>
-        <div className="feed-compose-input">Drop a flyer or share what's happening...</div>
-        <button
-          type="button"
-          className="upload-flyer-btn feed-compose-btn"
-          onClick={(e) => { e.stopPropagation(); navigate('/upload') }}
-        >
-          Upload flyer
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="feed-compose feed-compose-expanded">
-      <div className="feed-compose-top">
-        <div className="feed-compose-avatar">
-          {myAvatar
-            ? <img src={myAvatar} alt="" className="feed-post-avatar-img" />
-            : displayName[0].toUpperCase()
-          }
-        </div>
-        <textarea
-          className="feed-compose-textarea"
-          placeholder="What's happening in the scene?"
-          rows={3}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          autoFocus
-          maxLength={1000}
-        />
-      </div>
-
-      {/* Image preview */}
-      {imagePreview && (
-        <div className="feed-compose-image-preview">
-          <img src={imagePreview} alt="Attachment preview" />
-          <button
-            type="button"
-            className="feed-compose-image-remove"
-            onClick={handleRemoveImage}
-            aria-label="Remove image"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {error && <p className="feed-compose-error">{error}</p>}
-      <div className="feed-compose-actions">
-        <div className="feed-compose-actions-left">
-          <button
-            type="button"
-            className="feed-compose-photo-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={posting}
-            title="Add a photo"
-          >
-            📷 Photo
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleImageSelect}
-          />
-          <button
-            type="button"
-            className="feed-compose-flyer-link"
-            onClick={() => navigate('/upload')}
-          >
-            + Upload a flyer instead
-          </button>
-        </div>
-        <div className="feed-compose-actions-right">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handlePost}
-            disabled={posting || (!text.trim() && !imageFile)}
-          >
-            {posting ? 'Posting…' : 'Post'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+  const haystack = normalize(chunks.filter(Boolean).join(' '))
+  return haystack.includes(query)
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -359,6 +181,7 @@ export default function Dashboard() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [avatarCache, setAvatarCache] = useState({}) // uid → avatarUrl
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -404,6 +227,9 @@ export default function Dashboard() {
   }, [])
 
   const posts = mergeByDate(flyers, statusPosts)
+  const filteredPosts = searchQuery.trim()
+    ? posts.filter((p) => postMatchesQuery(p, searchQuery))
+    : posts
 
   // Derive the live post from state so likes update in real time
   const liveSelectedPost = selectedPost
@@ -425,7 +251,35 @@ export default function Dashboard() {
         </button>
       }
     >
-      {currentUser && <StatusComposer currentUser={currentUser} avatarCache={avatarCache} />}
+      {currentUser && (
+        <StatusComposer
+          currentUser={currentUser}
+          myAvatarUrl={avatarCache[currentUser.uid] || ''}
+        />
+      )}
+
+      <div className="filter-bar" role="region" aria-label="Feed search">
+        <input
+          className="filter-input"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search feed (title, venue, city, DJs, status text...)"
+        />
+        <button
+          type="button"
+          className="btn-secondary filter-pill"
+          onClick={() => setSearchQuery('')}
+          disabled={!searchQuery.trim()}
+        >
+          Clear
+        </button>
+      </div>
+
+      {!isLoadingPosts && (
+        <p className="flyers-status">
+          Showing {filteredPosts.length} of {posts.length}
+        </p>
+      )}
 
       <p className="section-label" style={{ marginTop: '32px' }}>Latest posts</p>
 
@@ -447,8 +301,12 @@ export default function Dashboard() {
         </div>
       )}
 
+      {!isLoadingPosts && posts.length > 0 && filteredPosts.length === 0 && (
+        <p className="flyers-status">No matches. Try a different search.</p>
+      )}
+
       <div className="feed">
-        {posts.map((post) => {
+        {filteredPosts.map((post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
             ? <StatusPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
