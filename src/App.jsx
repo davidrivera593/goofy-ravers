@@ -9,6 +9,7 @@ import Profile from './pages/profile'
 import Chat from './pages/chat'
 import MapPage from './pages/map'
 import Calendar from './pages/calendar'
+import UserProfile from './pages/userProfile'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -93,6 +94,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Calendar />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/:uid"
+          element={
+            <ProtectedRoute>
+              <UserProfile />
             </ProtectedRoute>
           }
         />

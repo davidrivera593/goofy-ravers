@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   addDoc,
   arrayRemove,
@@ -14,10 +15,28 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
+function extractYouTubeId(url) {
+  if (!url) return null
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
+  const navigate = useNavigate()
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [displayText, setDisplayText] = useState(post.text || '')
   const inputRef = useRef(null)
 
   const liked = currentUser && Array.isArray(post.likes) && post.likes.includes(currentUser.uid)
@@ -100,9 +119,21 @@ export default function PostModal({ post, collection: colName, currentUser, avat
     }
   }
 
+  async function handleSaveEdit() {
+    if (!editText.trim()) return
+    try {
+      await updateDoc(doc(db, colName, post.id), { text: editText.trim() })
+      setDisplayText(editText.trim())
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Edit failed:', err)
+    }
+  }
+
   const posterName = post.uploadedByName || 'Raver'
   const posterAvatar = post.uploadedByAvatar || avatarCache[post.uploadedBy] || ''
-  const hasImage = Boolean(post.imageUrl)
+  const ytVideoId = extractYouTubeId(post.youtubeUrl)
+  const hasImage = Boolean(post.imageUrl) || Boolean(ytVideoId)
 
   const rightPanel = (
     <div className="post-modal-right">
@@ -117,7 +148,10 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             }
           </div>
           <div>
-            <div className="post-modal-name">{posterName}</div>
+            {post.uploadedBy
+              ? <Link to={`/profile/${post.uploadedBy}`} className="post-modal-name post-modal-name-link" onClick={onClose}>{posterName}</Link>
+              : <div className="post-modal-name">{posterName}</div>
+            }
             {post.uploadedAt?.toDate && (
               <div className="post-modal-date">
                 {post.uploadedAt.toDate().toLocaleDateString('en-US', {
@@ -129,7 +163,27 @@ export default function PostModal({ post, collection: colName, currentUser, avat
         </div>
 
         {post.postType === 'status' ? (
-          <p className="post-modal-status-text">{post.text}</p>
+          isEditing ? (
+            <div className="post-modal-inline-edit">
+              <textarea
+                className="post-modal-edit-textarea"
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                maxLength={500}
+                autoFocus
+              />
+              <div className="post-modal-edit-actions">
+                <button type="button" className="post-modal-edit-cancel" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="post-modal-edit-save" onClick={handleSaveEdit} disabled={!editText.trim()}>
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="post-modal-status-text">{displayText}</p>
+          )
         ) : (
           <>
             {post.title && <h2 className="post-modal-title">{post.title}</h2>}
@@ -173,6 +227,23 @@ export default function PostModal({ post, collection: colName, currentUser, avat
           >
             ✋
             <span>{goingCount} going</span>
+          </button>
+        )}
+        {currentUser?.uid === post.uploadedBy && (
+          <button
+            className="post-modal-edit-btn"
+            onClick={() => {
+              if (isFlyer) {
+                onClose()
+                navigate(`/upload?edit=${post.id}`)
+              } else {
+                setEditText(post.text || '')
+                setIsEditing(true)
+              }
+            }}
+            aria-label="Edit"
+          >
+            ✏ Edit
           </button>
         )}
       </div>
@@ -242,11 +313,17 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       >
         {hasImage && (
           <div className="post-modal-left">
-            <img
-              src={post.imageUrl}
-              alt={post.title || 'Post image'}
-              className="post-modal-image"
-            />
+            {post.imageUrl
+              ? <img src={post.imageUrl} alt={post.title || 'Post image'} className="post-modal-image" />
+              : <div className="post-modal-youtube">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${ytVideoId}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="YouTube video"
+                  />
+                </div>
+            }
           </div>
         )}
         {rightPanel}

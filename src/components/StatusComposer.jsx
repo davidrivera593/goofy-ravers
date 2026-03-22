@@ -6,6 +6,20 @@ import { db, storage } from '../firebase/config'
 
 const MAX_POST_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
 
+function extractYouTubeId(url) {
+  if (!url) return null
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+  ]
+  for (const p of patterns) {
+    const m = String(url).match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 export default function StatusComposer({
   currentUser,
   myAvatarUrl = '',
@@ -18,6 +32,7 @@ export default function StatusComposer({
   const [text, setText] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [youtubeUrl, setYoutubeUrl] = useState('')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState('')
 
@@ -62,12 +77,13 @@ export default function StatusComposer({
   function handleCancel() {
     setExpandedSafe(false)
     setText('')
+    setYoutubeUrl('')
     setError('')
     handleRemoveImage()
   }
 
   async function handlePost() {
-    if (!text.trim() && !imageFile) return
+    if (!text.trim() && !imageFile && !youtubeUrl.trim()) return
     if (!currentUser?.uid) return
     setPosting(true)
     setError('')
@@ -98,6 +114,7 @@ export default function StatusComposer({
         postType: 'status',
         text: text.trim(),
         imageUrl,
+        youtubeUrl: youtubeUrl.trim(),
         uploadedBy: currentUser.uid,
         uploadedByName: displayName,
         uploadedByAvatar: avatarUrl,
@@ -107,6 +124,7 @@ export default function StatusComposer({
       })
 
       setText('')
+      setYoutubeUrl('')
       handleRemoveImage()
       setExpandedSafe(false)
     } catch (err) {
@@ -181,6 +199,33 @@ export default function StatusComposer({
       )}
 
       {error && <p className="feed-compose-error">{error}</p>}
+
+      <div className="feed-compose-youtube">
+        <input
+          className="feed-compose-youtube-input"
+          type="url"
+          placeholder="🎬 Paste a YouTube link (optional)"
+          value={youtubeUrl}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
+          disabled={posting}
+        />
+        {youtubeUrl && extractYouTubeId(youtubeUrl) && (
+          <div className="feed-compose-youtube-preview">
+            <img
+              src={`https://img.youtube.com/vi/${extractYouTubeId(youtubeUrl)}/mqdefault.jpg`}
+              alt="Video preview"
+            />
+            <button
+              type="button"
+              className="feed-compose-youtube-remove"
+              onClick={() => setYoutubeUrl('')}
+              aria-label="Remove YouTube link"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
       <div className="feed-compose-actions">
         <div className="feed-compose-actions-left">
           <button
@@ -219,7 +264,7 @@ export default function StatusComposer({
             type="button"
             className="btn-primary"
             onClick={handlePost}
-            disabled={posting || (!text.trim() && !imageFile)}
+            disabled={posting || (!text.trim() && !imageFile && !youtubeUrl.trim())}
           >
             {posting ? 'Posting…' : 'Post'}
           </button>
