@@ -200,6 +200,7 @@ export default function Flyers() {
       : []
 
     const filtered = flyers.filter((f) => {
+      if (!f.title?.trim()) return false
       if (cityNorm && normalizeText(f.city) !== cityNorm) return false
       if (upcomingOnly && !isUpcoming(f.date)) return false
 
@@ -415,7 +416,7 @@ export default function Flyers() {
             )}
 
             <div className="flyer-card-body">
-              <div className="dash-card-title">{flyer.title || 'Untitled event'}</div>
+              <div className="dash-card-title">{flyer.title}</div>
               <div className="dash-card-desc">
                 {[flyer.date, flyer.city].filter(Boolean).join(' • ') || 'Date and city not available'}
               </div>
@@ -457,7 +458,7 @@ export default function Flyers() {
               <div className="flyer-detail-head">
                 <div>
                   <p className="section-label">Flyer Details</p>
-                  <h2 className="flyer-detail-title">{selectedFlyer.title || 'Untitled event'}</h2>
+                  <h2 className="flyer-detail-title">{selectedFlyer.title}</h2>
                 </div>
                 <button
                   type="button"

@@ -488,7 +488,7 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
                       )}
                       <div className="map-panel-event-info">
                         <div className="map-panel-event-title">
-                          {flyer.title || 'Untitled event'}
+                          {flyer.title}
                         </div>
                         <div className="map-panel-event-meta">
                           {[flyer.date, flyer.city]
