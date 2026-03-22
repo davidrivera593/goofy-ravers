@@ -1019,6 +1019,14 @@ h1, h2, h3 {
   color: var(--text-h);
 }
 
+a.feed-post-name-link {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+a.feed-post-name-link:hover {
+  color: var(--cyan);
+}
+
 .feed-post-date {
   font-size: 11px;
   color: var(--text-dim);
@@ -1619,6 +1627,14 @@ h1, h2, h3 {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-h);
+}
+
+a.post-modal-name-link {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+a.post-modal-name-link:hover {
+  color: var(--cyan);
 }
 
 .post-modal-date {

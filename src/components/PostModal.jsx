@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   addDoc,
   arrayRemove,
@@ -133,7 +133,10 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             }
           </div>
           <div>
-            <div className="post-modal-name">{posterName}</div>
+            {post.uploadedBy
+              ? <Link to={`/profile/${post.uploadedBy}`} className="post-modal-name post-modal-name-link" onClick={onClose}>{posterName}</Link>
+              : <div className="post-modal-name">{posterName}</div>
+            }
             {post.uploadedAt?.toDate && (
               <div className="post-modal-date">
                 {post.uploadedAt.toDate().toLocaleDateString('en-US', {
