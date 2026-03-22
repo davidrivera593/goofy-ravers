@@ -14,6 +14,7 @@ const NAV_LINKS = [
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Raver'
   const initials = displayName[0].toUpperCase()
@@ -69,7 +70,53 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
             Sign out
           </button>
         </div>
+
+        {/* Hamburger — mobile only */}
+        <button
+          className="nav-hamburger"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Toggle menu"
+        >
+          <span className={`nav-hamburger-icon${menuOpen ? ' open' : ''}`}>
+            <span /><span /><span />
+          </span>
+        </button>
       </nav>
+
+      {/* Mobile drawer */}
+      {menuOpen && (
+        <div className="mobile-menu-overlay" onClick={() => setMenuOpen(false)} />
+      )}
+      <div className={`mobile-menu${menuOpen ? ' mobile-menu-open' : ''}`}>
+        <div className="mobile-menu-user" onClick={() => { navigate('/profile'); setMenuOpen(false) }}>
+          <div className="nav-avatar">
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
+              : initials
+            }
+          </div>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text-h)' }}>
+            {displayName}
+          </span>
+        </div>
+
+        <div className="mobile-menu-links">
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.path}
+              to={link.path}
+              className={({ isActive }) => `mobile-menu-link${isActive ? ' active' : ''}`}
+              onClick={() => setMenuOpen(false)}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </div>
+
+        <button className="mobile-menu-signout" onClick={handleLogout}>
+          Sign out
+        </button>
+      </div>
 
       <div className="dashboard-body">
         {(title || subtitle) && (

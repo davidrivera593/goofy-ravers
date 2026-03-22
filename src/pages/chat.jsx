@@ -61,12 +61,60 @@ const LAYOUT_PRESETS = [
 ]
 
 const SUGGESTIONS = [
+  'Design a layout for a gabber warehouse rave flyer',
   'What fonts work best for a happyhardcore flyer?',
   'How do I create a glitch effect in Photopea?',
   'Suggest a color palette for a jungle rave flyer',
-  'How do I set up bleed for print in Photopea?',
   'What pixel dimensions should a square Instagram post be?',
 ]
+
+const BLOCK_COLORS = {
+  title: 'var(--cyan)',
+  image: 'var(--magenta)',
+  text: 'var(--text-dim)',
+  lineup: 'var(--amber, #f5a214)',
+  footer: 'var(--surface2)',
+}
+
+function WireframeCanvas({ blocks }) {
+  return (
+    <svg
+      viewBox="0 0 100 178"
+      className="w-full"
+      style={{ aspectRatio: '9/16', maxHeight: '100%' }}
+    >
+      <rect x="0" y="0" width="100" height="178" fill="var(--bg2)" rx="2" />
+      {blocks.map((block, i) => {
+        const color = BLOCK_COLORS[block.type] || 'var(--text-dim)'
+        return (
+          <g key={i}>
+            <rect
+              x={block.x}
+              y={block.y}
+              width={block.width}
+              height={block.height}
+              fill="none"
+              stroke={color}
+              strokeWidth="0.5"
+              strokeDasharray="2 1"
+              rx="1"
+            />
+            <text
+              x={block.x + block.width / 2}
+              y={block.y + block.height / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={color}
+              style={{ fontSize: `${block.fontSize / 3}px`, fontFamily: 'var(--mono)' }}
+            >
+              {block.label}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
 
 function buildSystemPrompt(flyers) {
   const context = flyers.length
@@ -98,7 +146,15 @@ COMMUNITY FLYERS CONTEXT (recently uploaded, for design continuity):
 ${context}
 
 RESPONSE STYLE:
-Be specific, practical, and opinionated. Give exact hex codes, Photopea menu paths (e.g. "Image > Canvas Size"), font weights, and pixel dimensions. Keep responses concise and actionable for rave designers who know the basics but want to level up their craft.`
+Be specific, practical, and opinionated. Give exact hex codes, Photopea menu paths (e.g. "Image > Canvas Size"), font weights, and pixel dimensions. Keep responses concise and actionable for rave designers who know the basics but want to level up their craft.
+
+LAYOUT GENERATION:
+When the user asks for a flyer layout, composition wireframe, or arrangement, respond with LAYOUT: followed by a JSON array on the FIRST line, then a brief explanation on the next line. Do NOT wrap the JSON in markdown code fences.
+The wireframe canvas is 9:16 portrait. Coordinates map to a 100×178 grid (width 0-100, height 0-178).
+Each block must have: type ("title"|"image"|"text"|"lineup"|"footer"), label (short text like "EVENT NAME"), x, y, width, height, fontSize (8-24).
+Example:
+LAYOUT:[{"type":"title","label":"EVENT NAME","x":10,"y":8,"width":80,"height":18,"fontSize":20},{"type":"image","label":"KEY VISUAL","x":5,"y":30,"width":90,"height":60,"fontSize":14},{"type":"lineup","label":"DJ LINEUP","x":10,"y":95,"width":80,"height":22,"fontSize":12},{"type":"footer","label":"DATE • VENUE • TICKETS","x":10,"y":155,"width":80,"height":16,"fontSize":10}]
+Keep layouts bold and dynamic — this is rave design. When the user asks to adjust or change the layout, respond with a new LAYOUT: directive containing the full updated array.`
 }
 
 // ── Wireframe preview components ──────────────────────────────────────
@@ -216,6 +272,7 @@ export default function Chat() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [activeLayout, setActiveLayout] = useState(null)
+  const [layoutBlocks, setLayoutBlocks] = useState([])
   const bottomRef = useRef(null)
 
   useEffect(() => onAuthStateChanged(auth, setCurrentUser), [])
@@ -259,7 +316,13 @@ export default function Chat() {
       })
       const data = await res.json()
       const reply = extractAssistantText(data)
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      const layoutParsed = parseLayoutFromResponse(reply)
+      if (layoutParsed) {
+        setLayoutBlocks(layoutParsed.blocks)
+        setMessages(prev => [...prev, { role: 'assistant', content: layoutParsed.explanation }])
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      }
     } catch {
       setMessages(prev => [
         ...prev,
@@ -291,6 +354,28 @@ export default function Chat() {
     <AppLayout user={currentUser}>
       <div className="chat-layout">
 
+        {/* ── Wireframe canvas ─────────────────────────────────── */}
+        <div className="wireframe-col">
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
+            <p className="section-label" style={{ marginBottom: 4 }}>Wireframe Preview</p>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'var(--mono)', margin: 0 }}>
+              9:16 flyer canvas
+            </p>
+          </div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
+            {layoutBlocks.length > 0 ? (
+              <WireframeCanvas blocks={layoutBlocks} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '0 16px' }}>
+                <p style={{ fontSize: 32, marginBottom: 12 }}>📐</p>
+                <p style={{ fontSize: 12, lineHeight: 1.65, color: 'var(--text-dim)', fontFamily: 'var(--mono)', margin: 0 }}>
+                  Describe your flyer to generate a layout wireframe
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ── Chat column ───────────────────────────────────────── */}
         <div className="chat-col">
           <div className="chat-col-header">
@@ -304,7 +389,7 @@ export default function Chat() {
               <button
                 type="button"
                 className="chat-clear-btn"
-                onClick={() => { setMessages([]); setActiveLayout(null) }}
+                onClick={() => { setMessages([]); setActiveLayout(null); setLayoutBlocks([]) }}
               >
                 Clear chat
               </button>
@@ -317,7 +402,7 @@ export default function Chat() {
                 <div className="chat-empty-icon">🎨</div>
                 <h2 className="chat-empty-title">Meet our Goofy Raver bot - tailored for <a href="https://www.photopea.com" target="_blank" rel="noopener noreferrer">PhotoPea</a></h2>
                 <p className="chat-empty-sub">
-                  Ask about typography, colors, Photopea techniques — or click a layout on the right to get step-by-step design guidance.
+                  Ask about typography, colors, Photopea techniques — or describe a flyer to generate a wireframe layout on the left. Click a layout on the right for step-by-step guidance.
                 </p>
                 <div className="chat-suggestions">
                   {SUGGESTIONS.map(s => (
@@ -486,4 +571,20 @@ function normalizeAssistantMarkdown(text) {
   normalized = normalized.replace(/\\([*_`~\[\]()#+\-.!>])/g, '$1')
 
   return normalized
+}
+
+function parseLayoutFromResponse(text) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const firstLine = lines[0].trim()
+  if (!firstLine.startsWith('LAYOUT:')) return null
+  try {
+    const jsonStr = firstLine.slice(7).trim()
+    const blocks = JSON.parse(jsonStr)
+    if (!Array.isArray(blocks)) return null
+    const explanation = lines.slice(1).join('\n').trim() || "Here's your suggested layout! Describe changes and I'll update it."
+    return { blocks, explanation }
+  } catch {
+    return null
+  }
 }

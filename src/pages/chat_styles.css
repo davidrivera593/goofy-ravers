@@ -8,10 +8,23 @@
   min-height: 520px;
 }
 
+/* ── Wireframe column ────────────────────────────────────────────── */
+
+.wireframe-col {
+  flex: 35 35 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
 /* ── Chat column ─────────────────────────────────────────────────── */
 
 .chat-col {
-  flex: 1;
+  flex: 50 50 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -326,8 +339,8 @@
 /* ── Layouts column ──────────────────────────────────────────────── */
 
 .layouts-col {
-  width: 300px;
-  flex-shrink: 0;
+  flex: 25 25 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -560,12 +573,6 @@
 
 /* ── Responsive ──────────────────────────────────────────────────── */
 
-@media (max-width: 900px) {
-  .layouts-col {
-    width: 260px;
-  }
-}
-
 @media (max-width: 768px) {
   .chat-layout {
     flex-direction: column;
@@ -574,10 +581,20 @@
   }
 
   .chat-col {
+    order: 1;
     min-height: 60svh;
   }
 
+  .wireframe-col {
+    order: 2;
+    flex: none;
+    width: 100%;
+    height: 380px;
+  }
+
   .layouts-col {
+    order: 3;
+    flex: none;
     width: 100%;
     max-height: 300px;
   }
