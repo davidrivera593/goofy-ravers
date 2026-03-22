@@ -1,0 +1,418 @@
+/* ── Layout ───────────────────────────────────────────────────── */
+.cal-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .cal-layout { flex-direction: row; }
+}
+
+.cal-sidebar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .cal-sidebar {
+    width: 40%;
+    position: sticky;
+    top: 5rem;
+  }
+}
+
+.cal-events {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+@media (min-width: 1024px) {
+  .cal-events { width: 60%; }
+}
+
+/* ── Month Nav ────────────────────────────────────────────────── */
+.cal-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cal-month-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: border-color 200ms;
+  flex-shrink: 0;
+}
+
+.cal-month-btn:hover { border-color: var(--border-bright); }
+
+.cal-month-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  color: var(--text-h);
+}
+
+/* ── Mini Calendar ────────────────────────────────────────────── */
+.cal-mini {
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.cal-mini-day-names {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 0.25rem;
+}
+
+.cal-mini-day-name {
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+
+.cal-mini-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-mini-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  transition: all 150ms;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.cal-mini-cell--today    { color: var(--cyan); font-weight: 700; }
+.cal-mini-cell--has-event { color: var(--text-h); }
+.cal-mini-cell--selected {
+  background: var(--cyan-dim);
+  border-color: var(--border-bright);
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.cal-mini-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cyan);
+  flex-shrink: 0;
+}
+
+/* ── Clear Day Button ─────────────────────────────────────────── */
+.cal-clear-btn {
+  width: 100%;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border);
+  padding: 0.375rem 0.75rem;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 200ms;
+}
+
+.cal-clear-btn:hover {
+  border-color: var(--border-bright);
+  color: var(--text-h);
+}
+
+/* ── City Filters ─────────────────────────────────────────────── */
+.cal-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cal-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+
+.cal-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.cal-filter-chip {
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 200ms;
+  background: var(--surface);
+  color: var(--text-dim);
+}
+
+.cal-filter-chip--active {
+  background: var(--cyan-dim);
+  border-color: var(--border-bright);
+  color: var(--cyan);
+}
+
+/* ── Toggle ───────────────────────────────────────────────────── */
+.cal-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.cal-toggle-label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.cal-toggle-track {
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: all 200ms;
+  flex-shrink: 0;
+  background: var(--surface2);
+}
+
+.cal-toggle-track--on {
+  background: var(--cyan-dim);
+  border-color: var(--border-bright);
+}
+
+.cal-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  transition: all 200ms;
+  background: var(--text-dim);
+}
+
+.cal-toggle-thumb--on {
+  left: calc(100% - 18px);
+  background: var(--cyan);
+}
+
+/* ── Event List ───────────────────────────────────────────────── */
+.cal-loading {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.cal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 4rem 0;
+  gap: 0.75rem;
+}
+
+.cal-empty-icon  { font-size: 3rem; }
+.cal-empty-title { font-size: 1.125rem; font-weight: 700; margin: 0; color: var(--text-h); }
+.cal-empty-sub   { font-size: 0.875rem; margin: 0; color: var(--text-dim); }
+
+.cal-city-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cal-city-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cal-city-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--mono);
+  color: var(--text-h);
+}
+
+.cal-city-count {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+
+.cal-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Event Card ───────────────────────────────────────────────── */
+.cal-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 200ms, box-shadow 200ms, border-color 200ms;
+  overflow: hidden;
+  background: var(--surface);
+  position: relative;
+}
+
+.cal-card:hover {
+  border-color: rgba(245, 226, 20, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.cal-card:hover .cal-card-accent { opacity: 1; }
+
+.cal-card-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: none;
+  background: linear-gradient(to right, var(--cyan), var(--magenta));
+}
+
+.cal-card-img {
+  width: 100%;
+  height: 11rem;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cal-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cal-card-placeholder {
+  width: 100%;
+  height: 7rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.cal-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.cal-card-date {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  color: var(--cyan);
+}
+
+.cal-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cal-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.375;
+  margin: 0;
+  color: var(--text-h);
+}
+
+.cal-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--text-dim);
+}
+
+.cal-card-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.cal-card-genre {
+  font-size: 9px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  color: var(--text-dim);
+  background: var(--surface2);
+}
+
+.cal-card-djs {
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  color: var(--text-dim);
+}

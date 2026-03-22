@@ -7,6 +7,7 @@ import Flyers from './pages/flyers'
 import Upload from './pages/upload'
 import Profile from './pages/profile'
 import Chat from './pages/chat'
+import Calendar from './pages/calendar'
 import { auth } from './firebase/config'
 
 function ProtectedRoute({ children }) {
@@ -75,6 +76,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Chat />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Calendar />
             </ProtectedRoute>
           }
         />
