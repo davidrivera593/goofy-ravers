@@ -61,7 +61,7 @@ const LAYOUT_PRESETS = [
 ]
 
 const SUGGESTIONS = [
-  'Design a layout for a techno warehouse rave flyer',
+  'Design a layout for a gabber warehouse rave flyer',
   'What fonts work best for a happyhardcore flyer?',
   'How do I create a glitch effect in Photopea?',
   'Suggest a color palette for a jungle rave flyer',
@@ -355,9 +355,7 @@ export default function Chat() {
       <div className="chat-layout">
 
         {/* ── Wireframe canvas ─────────────────────────────────── */}
-        <div className="hidden lg:flex flex-col"
-          style={{ flexGrow: 35, flexShrink: 35, flexBasis: 0, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}
-        >
+        <div className="wireframe-col">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
             <p className="section-label" style={{ marginBottom: 4 }}>Wireframe Preview</p>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'var(--mono)', margin: 0 }}>
