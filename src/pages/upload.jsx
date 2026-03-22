@@ -15,6 +15,7 @@ const EMPTY_FORM = {
   title: '',
   date: '',
   venue: '',
+  address: '',
   city: '',
   genres: '',
   djs: '',
@@ -93,11 +94,14 @@ export default function Upload() {
                 type: 'text',
                 text: `You are parsing event flyers for an Arizona underground rave and electronic music platform. The cities we operate in are: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa.
 
+Venue/location hints: venue names often include words like Venue, Warehouse, Theater/Theatre. Treat those as strong signals of the venue name (not the event title). If the flyer includes a street address or cross streets, extract it.
+
 Extract event details from this flyer and return ONLY a valid JSON object — no markdown, no backticks, no explanation:
 {
   "title": "the event or night name (not the venue name) or empty string",
   "date": "date in YYYY-MM-DD format — if no year is listed assume ${new Date().getFullYear()} — or empty string",
   "venue": "the physical venue or club name or empty string",
+  "address": "street address and/or cross streets (e.g. '123 W Example St' or '7th St & Roosevelt') or empty string",
   "city": "must be exactly one of: Phoenix, Tucson, Flagstaff, Tempe, Scottsdale, Mesa, Other — or empty string",
   "genres": "comma-separated music genres (e.g. techno, house, dnb, psytrance) or empty string",
   "djs": "comma-separated performer and DJ names exactly as written on the flyer or empty string",
@@ -116,6 +120,7 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
         title: parsed.title ?? '',
         date: parsed.date ?? '',
         venue: parsed.venue ?? '',
+        address: parsed.address ?? '',
         city: parsed.city ?? '',
         genres: parsed.genres ?? '',
         djs: parsed.djs ?? '',
@@ -169,7 +174,7 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
       try {
         const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
         if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
-      } catch (_) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
 
       const payload = buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl })
 
@@ -328,6 +333,21 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
                 </div>
 
                 <div className="upload-field">
+                  <label className="upload-field-label" htmlFor="address">
+                    Address <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <input
+                    id="address"
+                    className="upload-field-input"
+                    type="text"
+                    placeholder="e.g. 123 W Sample St or 7th St & Roosevelt"
+                    value={form.address}
+                    onChange={(e) => handleField('address', e.target.value)}
+                    disabled={status === 'parsing'}
+                  />
+                </div>
+
+                <div className="upload-field">
                   <label className="upload-field-label" htmlFor="city">City</label>
                   <select
                     id="city"
@@ -456,6 +476,7 @@ function buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl }) {
     title: form.title.trim(),
     date: form.date.trim(),
     venue: form.venue.trim(),
+    address: form.address.trim(),
     city: form.city.trim(),
     genres: form.genres
       .split(',')
