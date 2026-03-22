@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../firebase/config'
@@ -306,16 +307,28 @@ export default function Profile() {
         return
       }
 
+      const newName = draftName.trim()
+
       await setDoc(
         doc(db, 'users', currentUser.uid),
         {
-          displayName: draftName.trim(),
+          displayName: newName,
           bio: draftBio.trim(),
           favoriteTrackUrl: cleanedTrackUrl,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
       )
+
+      // Propagate new name to all existing posts and flyers
+      if (newName !== displayName) {
+        const batch = writeBatch(db)
+        ;[...flyers, ...statusPosts].forEach((post) => {
+          batch.update(doc(db, post._col, post.id), { uploadedByName: newName })
+        })
+        await batch.commit()
+      }
+
       setIsEditing(false)
       setSaveMsg('Profile saved.')
     } catch (err) {
@@ -530,14 +543,6 @@ export default function Profile() {
       {/* ── Personal posts ── */}
       <div className="dashboard-header-top" style={{ marginTop: '56px', marginBottom: '20px', paddingTop: '24px' }}>
         <p className="section-label" style={{ margin: 0 }}>Your posts</p>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setComposeOpen(true)}
-          disabled={!currentUser}
-        >
-          + Create post
-        </button>
       </div>
 
       {currentUser && (
@@ -545,6 +550,7 @@ export default function Profile() {
           currentUser={currentUser}
           myAvatarUrl={avatarUrl}
           forceExpand={composeOpen}
+          showCreateBtn={true}
           onExpandedChange={(open) => {
             if (!open) setComposeOpen(false)
           }}

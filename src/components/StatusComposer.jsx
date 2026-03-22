@@ -25,6 +25,7 @@ export default function StatusComposer({
   myAvatarUrl = '',
   forceExpand = false,
   onExpandedChange,
+  showCreateBtn = false,
 }) {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
@@ -153,6 +154,15 @@ export default function StatusComposer({
           }
         </div>
         <div className="feed-compose-input">Drop a flyer or share what's happening...</div>
+        {showCreateBtn && (
+          <button
+            type="button"
+            className="upload-flyer-btn feed-compose-btn"
+            onClick={(e) => { e.stopPropagation(); setExpandedSafe(true) }}
+          >
+            + Create post
+          </button>
+        )}
         <button
           type="button"
           className="upload-flyer-btn feed-compose-btn"

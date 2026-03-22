@@ -273,20 +273,12 @@ export default function Dashboard() {
       user={currentUser}
       title="Feed"
       subtitle="What's happening in the AZ underground scene."
-      headerAction={
-        <button
-          type="button"
-          className="upload-flyer-btn"
-          onClick={() => navigate('/upload')}
-        >
-          + New post
-        </button>
-      }
     >
       {currentUser && (
         <StatusComposer
           currentUser={currentUser}
           myAvatarUrl={avatarCache[currentUser.uid] || ''}
+          showCreateBtn={true}
         />
       )}
 
