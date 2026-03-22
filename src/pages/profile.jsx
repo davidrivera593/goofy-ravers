@@ -530,14 +530,6 @@ export default function Profile() {
       {/* ── Personal posts ── */}
       <div className="dashboard-header-top" style={{ marginTop: '40px' }}>
         <p className="section-label" style={{ margin: 0 }}>Your posts</p>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setComposeOpen(true)}
-          disabled={!currentUser}
-        >
-          + Create post
-        </button>
       </div>
 
       {currentUser && (
@@ -545,6 +537,7 @@ export default function Profile() {
           currentUser={currentUser}
           myAvatarUrl={avatarUrl}
           forceExpand={composeOpen}
+          showCreateBtn={true}
           onExpandedChange={(open) => {
             if (!open) setComposeOpen(false)
           }}

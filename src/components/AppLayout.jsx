@@ -5,10 +5,10 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
 
 const NAV_LINKS = [
+  { label: 'Design with GARB', path: '/chat' },
   { label: 'Flyers', path: '/flyers' },
   { label: 'Calendar', path: '/calendar' },
   { label: 'Map', path: '/map' },
-  { label: 'GARB (our design bot)', path: '/chat' },
 ]
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
