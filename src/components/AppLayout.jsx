@@ -3,22 +3,37 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 
-const NAV_LINKS = [
-  { label: 'Design with GARB', path: '/chat' },
+// Links visible to everyone
+const PUBLIC_LINKS = [
   { label: 'Flyers', path: '/flyers' },
   { label: 'Calendar', path: '/calendar' },
   { label: 'Map', path: '/map' },
+]
+
+// Links visible only to authenticated users
+const AUTH_LINKS = [
+  { label: 'Design with GARB', path: '/chat' },
   { label: 'Upload flyer', path: '/upload' },
 ]
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
 
+  const isLoggedIn = Boolean(user)
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Raver'
-  const initials = displayName[0].toUpperCase()
+  const initials = isLoggedIn ? displayName[0].toUpperCase() : '?'
+
+  // Build nav links based on auth state
+  const navLinks = [
+    ...PUBLIC_LINKS,
+    ...(isLoggedIn ? AUTH_LINKS : []),
+    ...(isAdmin ? [{ label: 'Admin', path: '/admin' }] : []),
+  ]
 
   // Listen to user doc for avatar
   useEffect(() => {
@@ -44,7 +59,7 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
         </Link>
 
         <div className="nav-links">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <NavLink
               key={link.path}
               to={link.path}
@@ -55,22 +70,30 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
           ))}
         </div>
 
-        <div className="nav-right">
-          <button className="nav-user" onClick={() => navigate('/profile')}>
-            <div className="nav-avatar">
-              {avatarUrl
-                ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
-                : initials
-              }
-            </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>
-              {displayName}
-            </span>
-          </button>
-          <button className="btn-logout" onClick={handleLogout}>
-            Sign out
-          </button>
-        </div>
+        {isLoggedIn ? (
+          <div className="nav-right">
+            <button className="nav-user" onClick={() => navigate('/profile')}>
+              <div className="nav-avatar">
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
+                  : initials
+                }
+              </div>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '12px' }}>
+                {displayName}
+              </span>
+            </button>
+            <button className="btn-logout" onClick={handleLogout}>
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="nav-right">
+            <Link to="/" className="btn-logout" style={{ textDecoration: 'none' }}>
+              Sign in
+            </Link>
+          </div>
+        )}
 
         {/* Hamburger — mobile only */}
         <button
@@ -89,20 +112,28 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
         <div className="mobile-menu-overlay" onClick={() => setMenuOpen(false)} />
       )}
       <div className={`mobile-menu${menuOpen ? ' mobile-menu-open' : ''}`}>
-        <div className="mobile-menu-user" onClick={() => { navigate('/profile'); setMenuOpen(false) }}>
-          <div className="nav-avatar">
-            {avatarUrl
-              ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
-              : initials
-            }
+        {isLoggedIn ? (
+          <div className="mobile-menu-user" onClick={() => { navigate('/profile'); setMenuOpen(false) }}>
+            <div className="nav-avatar">
+              {avatarUrl
+                ? <img src={avatarUrl} alt="" className="nav-avatar-img" />
+                : initials
+              }
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text-h)' }}>
+              {displayName}
+            </span>
           </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text-h)' }}>
-            {displayName}
-          </span>
-        </div>
+        ) : (
+          <div className="mobile-menu-user" onClick={() => { navigate('/'); setMenuOpen(false) }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text-h)' }}>
+              Sign in / Sign up
+            </span>
+          </div>
+        )}
 
         <div className="mobile-menu-links">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <NavLink
               key={link.path}
               to={link.path}
@@ -114,9 +145,11 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
           ))}
         </div>
 
-        <button className="mobile-menu-signout" onClick={handleLogout}>
-          Sign out
-        </button>
+        {isLoggedIn && (
+          <button className="mobile-menu-signout" onClick={handleLogout}>
+            Sign out
+          </button>
+        )}
       </div>
 
       <div className="dashboard-body">

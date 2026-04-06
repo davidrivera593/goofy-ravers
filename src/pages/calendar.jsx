@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { auth, db } from '../firebase/config'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import './calendar.css'
@@ -122,7 +122,7 @@ function EventCard({ flyer, onClick }) {
 // ── Main Page ─────────────────────────────────────────────────────
 export default function Calendar() {
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [flyers, setFlyers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [cityFilter, setCityFilter] = useState('All')
@@ -133,11 +133,6 @@ export default function Calendar() {
   const now = new Date()
   const [calYear, setCalYear] = useState(now.getFullYear())
   const [calMonth, setCalMonth] = useState(now.getMonth())
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => setCurrentUser(u))
-    return () => unsub()
-  }, [])
 
   useEffect(() => {
     const q = query(collection(db, 'flyers'), orderBy('date', 'asc'))

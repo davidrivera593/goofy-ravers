@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() {
+      return isAuth() && getUserRole() == 'admin';
+    }
+    function isMod() {
+      return isAuth() && (getUserRole() == 'moderator' || getUserRole() == 'admin');
+    }
+
+    // ── Users ─────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if isOwner(uid);
+      // Users can update their own doc but CANNOT change their own role or banned fields
+      allow update: if isOwner(uid)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'banned']));
+    }
+
+    // ── Flyers ────────────────────────────────────────────────────
+    match /flyers/{flyerId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+      allow delete: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow delete: if isAuth() && (isOwner(resource.data.authorId) || isMod());
+      }
+    }
+
+    // ── Posts ──────────────────────────────────────────────────────
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+      allow delete: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow delete: if isAuth() && (isOwner(resource.data.authorId) || isMod());
+      }
+    }
+
+    // ── Reports ───────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isAuth() && isMod();
+      allow create: if isAuth();
+      allow update: if isAuth() && isMod();
+      allow delete: if isAuth() && isAdmin();
+    }
+
+    // ── Locations ─────────────────────────────────────────────────
+    match /locations/{locationId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+  }
+}

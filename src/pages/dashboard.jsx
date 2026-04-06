@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
 import {
   collection,
   onSnapshot,
   orderBy,
   query,
 } from 'firebase/firestore'
-import { auth, db } from '../firebase/config'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import StatusComposer from '../components/StatusComposer'
@@ -207,20 +207,13 @@ function postMatchesQuery(post, q) {
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [flyers, setFlyers] = useState([])
   const [statusPosts, setStatusPosts] = useState([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [avatarCache, setAvatarCache] = useState({}) // uid → avatarUrl
   const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user)
-    })
-    return () => unsubscribe()
-  }, [])
 
   // Listen to all user docs for avatar URLs
   useEffect(() => {
