@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
 import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { auth, db, storage } from '../firebase/config'
+import { db, storage } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import './upload_styles.css'
 import { callClaude } from '../lib/claude'
@@ -28,7 +28,7 @@ export default function Upload() {
   const editId = searchParams.get('edit') // null = create, string = edit existing
   const fileInputRef = useRef(null)
 
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -36,11 +36,6 @@ export default function Upload() {
   const [status, setStatus] = useState('idle') // idle | parsing | uploading | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user))
-    return () => unsubscribe()
-  }, [])
 
   // ── Load existing flyer when editing ──────────────────────────────
   useEffect(() => {

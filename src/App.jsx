@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Home from './pages/home'
 import Dashboard from './pages/dashboard'
 import Flyers from './pages/flyers'
@@ -10,24 +9,12 @@ import Chat from './pages/chat'
 import MapPage from './pages/map'
 import Calendar from './pages/calendar'
 import UserProfile from './pages/userProfile'
-import { auth } from './firebase/config'
+import Admin from './pages/admin'
 
 function ProtectedRoute({ children }) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const { isAuthenticated, loading } = useAuth()
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(Boolean(user))
-      setIsLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [])
-
-  if (isLoading) {
-    return null
-  }
+  if (loading) return null
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />
@@ -36,76 +23,69 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+function AdminRoute({ children }) {
+  const { isAuthenticated, isAdmin, loading } = useAuth()
+
+  if (loading) return null
+
+  if (!isAuthenticated || !isAdmin) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return children
+}
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/flyers"
-          element={
-            <ProtectedRoute>
-              <Flyers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute>
-              <Upload />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute>
-              <Chat />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/map"
-          element={
-            <ProtectedRoute>
-              <MapPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Calendar />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile/:uid"
-          element={
-            <ProtectedRoute>
-              <UserProfile />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+
+          {/* Public routes — browsable without login */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/flyers" element={<Flyers />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/profile/:uid" element={<UserProfile />} />
+
+          {/* Auth-required routes */}
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute>
+                <Upload />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin-only route */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { auth, db } from '../firebase/config'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 
 const CITIES = ['Phoenix', 'Tucson', 'Flagstaff', 'Tempe', 'Scottsdale', 'Mesa', 'Other']
@@ -125,7 +125,7 @@ function GenreDropdown({ options, value, onChange }) {
 
 export default function Flyers() {
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [flyers, setFlyers] = useState([])
   const [isLoadingFlyers, setIsLoadingFlyers] = useState(true)
   const [flyersError, setFlyersError] = useState('')
@@ -139,13 +139,6 @@ export default function Flyers() {
   const [dateTo, setDateTo] = useState('')
   const [upcomingOnly, setUpcomingOnly] = useState(false)
   const [sortBy, setSortBy] = useState('uploaded_desc')
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user)
-    })
-    return () => unsubscribe()
-  }, [])
 
   useEffect(() => {
     const flyersQuery = query(collection(db, 'flyers'), orderBy('uploadedAt', 'desc'))

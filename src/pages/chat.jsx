@@ -1,9 +1,9 @@
 import { Component, useEffect, useRef, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { auth, db } from '../firebase/config'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import './chat_styles.css'
 
@@ -266,7 +266,7 @@ class MarkdownRenderBoundary extends Component {
 // ── Main component ────────────────────────────────────────────────────
 
 export default function Chat() {
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [flyers, setFlyers] = useState([])
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -274,8 +274,6 @@ export default function Chat() {
   const [activeLayout, setActiveLayout] = useState(null)
   const [layoutBlocks, setLayoutBlocks] = useState([])
   const bottomRef = useRef(null)
-
-  useEffect(() => onAuthStateChanged(auth, setCurrentUser), [])
 
   useEffect(() => {
     async function loadFlyers() {

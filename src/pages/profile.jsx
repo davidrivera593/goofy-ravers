@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { onAuthStateChanged } from 'firebase/auth'
 import {
   collection,
   doc,
@@ -13,7 +12,8 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
-import { auth, db, storage } from '../firebase/config'
+import { db, storage } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import StatusComposer from '../components/StatusComposer'
@@ -173,7 +173,7 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
 
 export default function Profile() {
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
 
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
@@ -194,13 +194,6 @@ export default function Profile() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [composeOpen, setComposeOpen] = useState(false)
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user)
-    })
-    return () => unsubscribe()
-  }, [])
 
   // Load user profile doc
   useEffect(() => {

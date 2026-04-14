@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
 import {
   addDoc,
   collection,
@@ -12,7 +11,8 @@ import {
 } from 'firebase/firestore'
 import { Map as MapGL, Marker, NavigationControl } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { auth, db } from '../firebase/config'
+import { db } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import { geocodeVenue } from '../lib/geocode'
 import { callClaude } from '../lib/claude'
@@ -29,7 +29,7 @@ const INITIAL_VIEW = {
 const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11'
 
 export default function MapPage() {
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const [locations, setLocations] = useState([])
   const [flyers, setFlyers] = useState([])
   const [selectedLocation, setSelectedLocation] = useState(null)
@@ -48,11 +48,6 @@ export default function MapPage() {
   const [viewState, setViewState] = useState(INITIAL_VIEW)
   const [mapReady, setMapReady] = useState(false)
   const geocodeRequestedRef = useRef(new Set())
-
-  // Auth
-  useEffect(() => {
-    return onAuthStateChanged(auth, setCurrentUser)
-  }, [])
 
   // Subscribe to locations collection
   useEffect(() => {

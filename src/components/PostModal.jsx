@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore'
 import { deleteObject, ref as storageRef } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
+import { useAuth } from '../contexts/AuthContext'
 
 function extractYouTubeId(url) {
   if (!url) return null
@@ -32,8 +33,11 @@ function extractYouTubeId(url) {
   return null
 }
 
+const REPORT_REASONS = ['Spam', 'Inappropriate', 'Harassment', 'Other']
+
 export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
   const navigate = useNavigate()
+  const { isMod, isAdmin } = useAuth()
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -42,6 +46,9 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   const [displayText, setDisplayText] = useState(post.text || '')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showReport, setShowReport] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reported, setReported] = useState(false)
   const inputRef = useRef(null)
 
   const liked = currentUser && Array.isArray(post.likes) && post.likes.includes(currentUser.uid)
@@ -49,6 +56,10 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   const isGoing = currentUser && Array.isArray(post.going) && post.going.includes(currentUser.uid)
   const goingCount = Array.isArray(post.going) ? post.going.length : 0
   const isFlyer = post.postType !== 'status'
+  const isOwner = currentUser?.uid === post.uploadedBy
+  const canModerate = isMod || isAdmin
+  const canDelete = isOwner || canModerate
+  const canEdit = isOwner // Only the owner can edit
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -136,7 +147,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   }
 
   async function handleDelete() {
-    if (!currentUser || currentUser.uid !== post.uploadedBy) return
+    if (!currentUser || !canDelete) return
     setDeleting(true)
     try {
       // Delete all comments in the subcollection
@@ -161,6 +172,28 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       console.error('Delete failed:', err)
       setDeleting(false)
       setConfirmDelete(false)
+    }
+  }
+
+  async function handleReport() {
+    if (!currentUser || !reportReason) return
+    try {
+      await addDoc(collection(db, 'reports'), {
+        contentId: post.id,
+        contentType: isFlyer ? 'flyer' : 'post',
+        collectionPath: colName,
+        reason: reportReason,
+        reportedBy: currentUser.uid,
+        reportedAt: serverTimestamp(),
+        contentOwnerId: post.uploadedBy,
+        status: 'pending',
+        reviewedBy: null,
+        reviewedAt: null,
+      })
+      setReported(true)
+      setShowReport(false)
+    } catch (err) {
+      console.error('Report failed:', err)
     }
   }
 
@@ -263,23 +296,29 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             <span>{goingCount} going</span>
           </button>
         )}
-        {currentUser?.uid === post.uploadedBy && (
+
+        {/* Edit — owner only */}
+        {canEdit && (
+          <button
+            className="post-modal-edit-btn"
+            onClick={() => {
+              if (isFlyer) {
+                onClose()
+                navigate(`/upload?edit=${post.id}`)
+              } else {
+                setEditText(post.text || '')
+                setIsEditing(true)
+              }
+            }}
+            aria-label="Edit"
+          >
+            ✏ Edit
+          </button>
+        )}
+
+        {/* Delete — owner or mod/admin */}
+        {canDelete && (
           <>
-            <button
-              className="post-modal-edit-btn"
-              onClick={() => {
-                if (isFlyer) {
-                  onClose()
-                  navigate(`/upload?edit=${post.id}`)
-                } else {
-                  setEditText(post.text || '')
-                  setIsEditing(true)
-                }
-              }}
-              aria-label="Edit"
-            >
-              ✏ Edit
-            </button>
             {confirmDelete ? (
               <div className="post-modal-delete-confirm">
                 <span className="post-modal-delete-confirm-text">Delete this post?</span>
@@ -288,7 +327,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
                   onClick={handleDelete}
                   disabled={deleting}
                 >
-                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                  {deleting ? 'Deleting...' : 'Yes, delete'}
                 </button>
                 <button
                   className="post-modal-delete-no"
@@ -309,7 +348,85 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             )}
           </>
         )}
+
+        {/* Report — authenticated users, not the owner */}
+        {currentUser && !isOwner && !reported && (
+          <button
+            className="post-modal-report-btn"
+            onClick={() => setShowReport(!showReport)}
+            aria-label="Report"
+            style={{ marginLeft: 'auto', opacity: 0.7, fontSize: '13px' }}
+          >
+            🚩 Report
+          </button>
+        )}
+        {reported && (
+          <span style={{ marginLeft: 'auto', opacity: 0.6, fontSize: '12px', fontFamily: 'var(--mono)' }}>
+            Reported
+          </span>
+        )}
       </div>
+
+      {/* Report reason picker */}
+      {showReport && (
+        <div className="post-modal-report" style={{
+          padding: '8px 16px',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          borderTop: '1px solid var(--border)',
+        }}>
+          {REPORT_REASONS.map((r) => (
+            <button
+              key={r}
+              className={reportReason === r ? 'feed-tag active' : 'feed-tag'}
+              onClick={() => setReportReason(r)}
+              style={{
+                cursor: 'pointer',
+                background: reportReason === r ? 'var(--cyan)' : 'var(--surface-2)',
+                color: reportReason === r ? '#000' : 'var(--text)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '12px',
+              }}
+            >
+              {r}
+            </button>
+          ))}
+          <button
+            onClick={handleReport}
+            disabled={!reportReason}
+            style={{
+              background: reportReason ? 'var(--magenta)' : 'var(--surface-2)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '4px 12px',
+              fontSize: '12px',
+              cursor: reportReason ? 'pointer' : 'default',
+              opacity: reportReason ? 1 : 0.5,
+            }}
+          >
+            Submit
+          </button>
+        </div>
+      )}
+
+      {/* Sign-in CTA for unauthenticated visitors */}
+      {!currentUser && (
+        <div style={{
+          padding: '12px 16px',
+          textAlign: 'center',
+          borderTop: '1px solid var(--border)',
+          fontFamily: 'var(--mono)',
+          fontSize: '13px',
+          opacity: 0.8,
+        }}>
+          <Link to="/" style={{ color: 'var(--cyan)' }}>Sign in</Link> to like, comment, and RSVP
+        </div>
+      )}
 
       {/* Comments list */}
       <div className="post-modal-comments">
@@ -347,7 +464,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
           <input
             ref={inputRef}
             className="post-modal-compose-input"
-            placeholder="Add a comment…"
+            placeholder="Add a comment..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             maxLength={500}

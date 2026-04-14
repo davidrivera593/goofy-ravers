@@ -1,31 +1,17 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-const {setGlobalOptions} = require("firebase-functions");
+const { setGlobalOptions } = require('firebase-functions')
 const { onRequest } = require('firebase-functions/v2/https')
+const { onCall, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const Anthropic = require('@anthropic-ai/sdk')
+const admin = require('firebase-admin')
+
+admin.initializeApp()
 
 const CLAUDE_API_KEY = defineSecret('CLAUDE_API_KEY')
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+setGlobalOptions({ maxInstances: 10 })
 
+// ── Claude AI Proxy ───────────────────────────────────────────────
 exports.claudeProxy = onRequest(
   { secrets: [CLAUDE_API_KEY], cors: true },
   async (req, res) => {
@@ -39,21 +25,84 @@ exports.claudeProxy = onRequest(
     const { messages, system, max_tokens = 1000, model = 'claude-sonnet-4-20250514' } = req.body
 
     const response = await client.messages.create({
-        model,
-        max_tokens,
-        system,
-        messages,
+      model,
+      max_tokens,
+      system,
+      messages,
     })
 
     res.json(response)
   }
 )
 
+// ── Set User Role (Admin Only) ───────────────────────────────────
+exports.setUserRole = onCall(async (request) => {
+  const callerUid = request.auth?.uid
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.')
+  }
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+  // Verify caller is admin
+  const callerDoc = await admin.firestore().doc(`users/${callerUid}`).get()
+  if (!callerDoc.exists || callerDoc.data().role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only admins can change roles.')
+  }
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+  const { targetUid, newRole } = request.data
+  if (!targetUid || !['user', 'moderator'].includes(newRole)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Provide a valid targetUid and newRole (user or moderator).'
+    )
+  }
+
+  // Prevent demoting yourself
+  if (targetUid === callerUid) {
+    throw new HttpsError('failed-precondition', 'Cannot change your own role.')
+  }
+
+  await admin.firestore().doc(`users/${targetUid}`).set(
+    { role: newRole },
+    { merge: true }
+  )
+
+  return { success: true, targetUid, newRole }
+})
+
+// ── Ban / Unban User (Admin Only) ────────────────────────────────
+exports.banUser = onCall(async (request) => {
+  const callerUid = request.auth?.uid
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.')
+  }
+
+  // Verify caller is admin
+  const callerDoc = await admin.firestore().doc(`users/${callerUid}`).get()
+  if (!callerDoc.exists || callerDoc.data().role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only admins can ban users.')
+  }
+
+  const { targetUid, banned } = request.data
+  if (!targetUid || typeof banned !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'Provide a valid targetUid and banned boolean.')
+  }
+
+  // Prevent banning yourself
+  if (targetUid === callerUid) {
+    throw new HttpsError('failed-precondition', 'Cannot ban yourself.')
+  }
+
+  // Update Firestore user doc
+  await admin.firestore().doc(`users/${targetUid}`).set(
+    {
+      banned: banned,
+      bannedAt: banned ? admin.firestore.FieldValue.serverTimestamp() : null,
+    },
+    { merge: true }
+  )
+
+  // Disable/enable the Firebase Auth account to prevent re-login
+  await admin.auth().updateUser(targetUid, { disabled: banned })
+
+  return { success: true, targetUid, banned }
+})
