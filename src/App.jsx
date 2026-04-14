@@ -5,7 +5,6 @@ import Dashboard from './pages/dashboard'
 import Flyers from './pages/flyers'
 import Upload from './pages/upload'
 import Profile from './pages/profile'
-import Chat from './pages/chat'
 import MapPage from './pages/map'
 import Calendar from './pages/calendar'
 import UserProfile from './pages/userProfile'
@@ -64,14 +63,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/chat"
-            element={
-              <ProtectedRoute>
-                <Chat />
               </ProtectedRoute>
             }
           />

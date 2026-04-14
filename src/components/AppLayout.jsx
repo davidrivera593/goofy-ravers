@@ -14,7 +14,6 @@ const PUBLIC_LINKS = [
 // Links visible only to authenticated users
 const AUTH_LINKS = [
   { label: 'Map', path: '/map' },
-  { label: 'Design with GARB', path: '/chat' },
   { label: 'Upload flyer', path: '/upload' },
 ]
 
