@@ -17,7 +17,7 @@ function ProtectedRoute({ children }) {
   if (loading) return null
 
   if (!isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/login" replace />
   }
 
   return children
@@ -40,13 +40,14 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/flyers" replace />} />
+          <Route path="/login" element={<Home />} />
 
           {/* Public routes — browsable without login */}
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/flyers" element={<Flyers />} />
           <Route path="/calendar" element={<Calendar />} />
-          <Route path="/map" element={<MapPage />} />
+          <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
           <Route path="/profile/:uid" element={<UserProfile />} />
 
           {/* Auth-required routes */}
