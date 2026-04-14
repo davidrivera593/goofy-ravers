@@ -9,12 +9,11 @@ import { useAuth } from '../contexts/AuthContext'
 const PUBLIC_LINKS = [
   { label: 'Flyers', path: '/flyers' },
   { label: 'Calendar', path: '/calendar' },
-  { label: 'Map', path: '/map' },
 ]
 
 // Links visible only to authenticated users
 const AUTH_LINKS = [
-  { label: 'Design with GARB', path: '/chat' },
+  { label: 'Map', path: '/map' },
   { label: 'Upload flyer', path: '/upload' },
 ]
 
@@ -47,13 +46,13 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
 
   async function handleLogout() {
     await signOut(auth)
-    navigate('/', { replace: true })
+    navigate('/flyers', { replace: true })
   }
 
   return (
     <div className="dashboard">
       <nav className="dashboard-nav">
-        <Link className="nav-logo" to="/dashboard">
+        <Link className="nav-logo" to={isLoggedIn ? '/dashboard' : '/flyers'}>
           <div className="nav-logo-mark">GR</div>
           <span className="nav-logo-text">GOOFY RAVERS</span>
         </Link>
@@ -89,7 +88,7 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
           </div>
         ) : (
           <div className="nav-right">
-            <Link to="/" className="btn-logout" style={{ textDecoration: 'none' }}>
+            <Link to="/login" className="btn-logout" style={{ textDecoration: 'none' }}>
               Sign in
             </Link>
           </div>
@@ -125,7 +124,7 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
             </span>
           </div>
         ) : (
-          <div className="mobile-menu-user" onClick={() => { navigate('/'); setMenuOpen(false) }}>
+          <div className="mobile-menu-user" onClick={() => { navigate('/login'); setMenuOpen(false) }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text-h)' }}>
               Sign in / Sign up
             </span>

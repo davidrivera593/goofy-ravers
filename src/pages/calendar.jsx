@@ -120,6 +120,8 @@ function EventCard({ flyer, onClick }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────────────
+const PAGE_SIZE = 6
+
 export default function Calendar() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -129,6 +131,7 @@ export default function Calendar() {
   const [showPast, setShowPast] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
   const [selectedFlyer, setSelectedFlyer] = useState(null)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const now = new Date()
   const [calYear, setCalYear] = useState(now.getFullYear())
@@ -169,26 +172,30 @@ export default function Calendar() {
     })
   }, [flyers, cityFilter, showPast, selectedDay, calYear, calMonth])
 
+  const visibleFiltered = filtered.slice(0, visibleCount)
+
   const grouped = useMemo(() => {
-    if (cityFilter !== 'All') return { [cityFilter]: filtered }
-    return filtered.reduce((acc, f) => {
+    if (cityFilter !== 'All') return { [cityFilter]: visibleFiltered }
+    return visibleFiltered.reduce((acc, f) => {
       const city = f.city || 'Other'
       if (!acc[city]) acc[city] = []
       acc[city].push(f)
       return acc
     }, {})
-  }, [filtered, cityFilter])
+  }, [visibleFiltered, cityFilter])
 
   function prevMonth() {
     if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11) }
     else setCalMonth(m => m - 1)
     setSelectedDay(null)
+    setVisibleCount(PAGE_SIZE)
   }
 
   function nextMonth() {
     if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0) }
     else setCalMonth(m => m + 1)
     setSelectedDay(null)
+    setVisibleCount(PAGE_SIZE)
   }
 
   return (
@@ -208,12 +215,12 @@ export default function Calendar() {
             year={calYear}
             month={calMonth}
             eventDates={eventDatesThisMonth}
-            onDayClick={day => setSelectedDay(prev => prev === day ? null : day)}
+            onDayClick={day => { setSelectedDay(prev => prev === day ? null : day); setVisibleCount(PAGE_SIZE) }}
             selectedDay={selectedDay}
           />
 
           {selectedDay && (
-            <button type="button" className="cal-clear-btn" onClick={() => setSelectedDay(null)}>
+            <button type="button" className="cal-clear-btn" onClick={() => { setSelectedDay(null); setVisibleCount(PAGE_SIZE) }}>
               ✕ Clear day filter
             </button>
           )}
@@ -225,7 +232,7 @@ export default function Calendar() {
                 <button
                   key={city}
                   type="button"
-                  onClick={() => setCityFilter(city)}
+                  onClick={() => { setCityFilter(city); setVisibleCount(PAGE_SIZE) }}
                   className={`cal-filter-chip${cityFilter === city ? ' cal-filter-chip--active' : ''}`}
                 >
                   {city}
@@ -240,8 +247,8 @@ export default function Calendar() {
               role="switch"
               aria-checked={showPast}
               tabIndex={0}
-              onClick={() => setShowPast(p => !p)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setShowPast(p => !p) }}
+              onClick={() => { setShowPast(p => !p); setVisibleCount(PAGE_SIZE) }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setShowPast(p => !p); setVisibleCount(PAGE_SIZE) } }}
               className={`cal-toggle-track${showPast ? ' cal-toggle-track--on' : ''}`}
             >
               <span className={`cal-toggle-thumb${showPast ? ' cal-toggle-thumb--on' : ''}`} />
@@ -270,6 +277,12 @@ export default function Calendar() {
             </div>
           )}
 
+          {!isLoading && filtered.length > 0 && (
+            <p className="cal-loading" style={{ marginBottom: '8px' }}>
+              Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} events
+            </p>
+          )}
+
           {!isLoading && Object.entries(grouped).map(([city, events]) => (
             <div key={city} className="cal-city-group">
               <div className="cal-city-header">
@@ -283,6 +296,17 @@ export default function Calendar() {
               </div>
             </div>
           ))}
+          {visibleCount < filtered.length && (
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setVisibleCount(n => n + PAGE_SIZE)}
+              >
+                Load more
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

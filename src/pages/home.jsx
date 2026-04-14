@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   createUserWithEmailAndPassword,
@@ -7,7 +7,8 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase/config'
 
 const googleProvider = new GoogleAuthProvider()
 
@@ -15,12 +16,16 @@ export default function Home() {
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null)
+  const [googleUsername, setGoogleUsername] = useState('')
+  const suppressRedirect = useRef(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -30,13 +35,18 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (currentUser) navigate('/dashboard', { replace: true })
+    if (currentUser && !suppressRedirect.current) navigate('/dashboard', { replace: true })
   }, [currentUser, navigate])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setMessage('')
     setIsSuccess(false)
+
+    if (mode === 'signup' && !username.trim()) {
+      setMessage('Please choose a username.')
+      return
+    }
 
     if (mode === 'signup' && password !== confirmPassword) {
       setMessage('Passwords do not match.')
@@ -46,7 +56,13 @@ export default function Home() {
     try {
       setLoading(true)
       if (mode === 'signup') {
-        await createUserWithEmailAndPassword(auth, email, password)
+        const { user } = await createUserWithEmailAndPassword(auth, email, password)
+        await setDoc(doc(db, 'users', user.uid), {
+          displayName: username.trim(),
+          bio: '',
+          avatarUrl: '',
+          createdAt: serverTimestamp(),
+        })
         setMessage('Account created.')
       } else {
         await signInWithEmailAndPassword(auth, email, password)
@@ -67,12 +83,83 @@ export default function Home() {
     setIsSuccess(false)
     try {
       setLoading(true)
-      await signInWithPopup(auth, googleProvider)
+      suppressRedirect.current = true
+      const result = await signInWithPopup(auth, googleProvider)
+      const snap = await getDoc(doc(db, 'users', result.user.uid))
+      if (snap.exists()) {
+        // Existing user — allow the redirect
+        suppressRedirect.current = false
+        navigate('/dashboard', { replace: true })
+      } else {
+        // New Google user — show username prompt
+        setPendingGoogleUser(result.user)
+      }
     } catch (error) {
       setMessage(error.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleGoogleUsernameSubmit(e) {
+    e.preventDefault()
+    if (!googleUsername.trim()) return
+    setLoading(true)
+    setMessage('')
+    try {
+      await setDoc(doc(db, 'users', pendingGoogleUser.uid), {
+        displayName: googleUsername.trim(),
+        bio: '',
+        avatarUrl: '',
+        createdAt: serverTimestamp(),
+      })
+      suppressRedirect.current = false
+      setPendingGoogleUser(null)
+      setGoogleUsername('')
+      navigate('/dashboard', { replace: true })
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (pendingGoogleUser) {
+    return (
+      <main className="auth-page">
+        <div className="auth-grid" />
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="auth-logo-mark">GR</div>
+            <span className="auth-logo-text">Goofy Ravers</span>
+          </div>
+
+          <h1>One last step</h1>
+          <p className="auth-subtitle">Choose a username for your profile.</p>
+
+          <form className="auth-form" onSubmit={handleGoogleUsernameSubmit}>
+            <label>
+              Username
+              <input
+                type="text"
+                autoComplete="username"
+                placeholder="Choose a username"
+                value={googleUsername}
+                onChange={(e) => setGoogleUsername(e.target.value)}
+                maxLength={40}
+                required
+                autoFocus
+              />
+            </label>
+            <button type="submit" className="btn-primary" disabled={loading || !googleUsername.trim()}>
+              {loading ? 'Saving...' : 'Continue'}
+            </button>
+          </form>
+
+          {message && <p className="auth-message">{message}</p>}
+        </div>
+      </main>
+    )
   }
 
   if (currentUser) {
@@ -128,6 +215,21 @@ export default function Home() {
         <div className="auth-divider">or</div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {mode === 'signup' && (
+            <label>
+              Username
+              <input
+                type="text"
+                autoComplete="username"
+                placeholder="Choose a username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                maxLength={40}
+                required
+              />
+            </label>
+          )}
+
           <label>
             Email
             <input
@@ -176,6 +278,7 @@ export default function Home() {
           className="auth-mode-toggle"
           onClick={() => {
             setMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'))
+            setUsername('')
             setMessage('')
             setIsSuccess(false)
           }}
