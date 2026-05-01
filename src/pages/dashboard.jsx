@@ -204,6 +204,8 @@ function postMatchesQuery(post, q) {
   return haystack.includes(query)
 }
 
+const PAGE_SIZE = 10
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -214,6 +216,7 @@ export default function Dashboard() {
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [avatarCache, setAvatarCache] = useState({}) // uid → avatarUrl
   const [searchQuery, setSearchQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   // Listen to all user docs for avatar URLs
   useEffect(() => {
@@ -255,6 +258,7 @@ export default function Dashboard() {
   const filteredPosts = searchQuery.trim()
     ? posts.filter((p) => postMatchesQuery(p, searchQuery))
     : posts
+  const visiblePosts = filteredPosts.slice(0, visibleCount)
 
   // Derive the live post from state so likes update in real time
   const liveSelectedPost = selectedPost
@@ -279,13 +283,13 @@ export default function Dashboard() {
         <input
           className="filter-input"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(PAGE_SIZE) }}
           placeholder="Search feed (title, venue, city, DJs, status text...)"
         />
         <button
           type="button"
           className="btn-secondary filter-pill"
-          onClick={() => setSearchQuery('')}
+          onClick={() => { setSearchQuery(''); setVisibleCount(PAGE_SIZE) }}
           disabled={!searchQuery.trim()}
         >
           Clear
@@ -323,13 +327,25 @@ export default function Dashboard() {
       )}
 
       <div className="feed">
-        {filteredPosts.map((post) => {
+        {visiblePosts.map((post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
             ? <StatusPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
             : <FlyerPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
         })}
       </div>
+
+      {visibleCount < filteredPosts.length && (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+          >
+            Load more
+          </button>
+        </div>
+      )}
 
       {liveSelectedPost && (
         <PostModal

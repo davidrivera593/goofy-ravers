@@ -171,6 +171,8 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
   )
 }
 
+const PAGE_SIZE = 10
+
 export default function Profile() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -194,6 +196,7 @@ export default function Profile() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [composeOpen, setComposeOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   // Load user profile doc
   useEffect(() => {
@@ -569,13 +572,25 @@ export default function Profile() {
       )}
 
       <div className="feed">
-        {posts.map((post) => {
+        {posts.slice(0, visibleCount).map((post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
             ? <StatusPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
             : <FlyerPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
         })}
       </div>
+
+      {visibleCount < posts.length && (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+          >
+            Load more
+          </button>
+        </div>
+      )}
 
       {liveSelectedPost && (
         <PostModal

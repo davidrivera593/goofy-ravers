@@ -123,6 +123,8 @@ function GenreDropdown({ options, value, onChange }) {
   )
 }
 
+const PAGE_SIZE = 12
+
 export default function Flyers() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -139,6 +141,9 @@ export default function Flyers() {
   const [dateTo, setDateTo] = useState('')
   const [upcomingOnly, setUpcomingOnly] = useState(false)
   const [sortBy, setSortBy] = useState('uploaded_desc')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
+  function resetPage() { setVisibleCount(PAGE_SIZE) }
 
   useEffect(() => {
     const flyersQuery = query(collection(db, 'flyers'), orderBy('uploadedAt', 'desc'))
@@ -276,7 +281,7 @@ export default function Flyers() {
         <input
           className="filter-input"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); resetPage() }}
           placeholder="Search title, venue, DJs, genres…"
           aria-label="Search flyers"
         />
@@ -284,7 +289,7 @@ export default function Flyers() {
         <input
           className="filter-input filter-input-venue"
           value={venueSearch}
-          onChange={(e) => setVenueSearch(e.target.value)}
+          onChange={(e) => { setVenueSearch(e.target.value); resetPage() }}
           placeholder="Venue only"
           aria-label="Search by venue"
         />
@@ -292,7 +297,7 @@ export default function Flyers() {
         <select
           className="filter-select"
           value={city}
-          onChange={(e) => setCity(e.target.value)}
+          onChange={(e) => { setCity(e.target.value); resetPage() }}
           aria-label="Filter by city"
         >
           <option value="">All cities</option>
@@ -301,27 +306,27 @@ export default function Flyers() {
           ))}
         </select>
 
-        <GenreDropdown options={genreOptions} value={genres} onChange={setGenres} />
+        <GenreDropdown options={genreOptions} value={genres} onChange={(v) => { setGenres(v); resetPage() }} />
 
         <input
           className="filter-select filter-date"
           type="date"
           value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
+          onChange={(e) => { setDateFrom(e.target.value); resetPage() }}
           aria-label="From date"
         />
         <input
           className="filter-select filter-date"
           type="date"
           value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
+          onChange={(e) => { setDateTo(e.target.value); resetPage() }}
           aria-label="To date"
         />
 
         <button
           type="button"
           className={`btn-secondary filter-pill${upcomingOnly ? ' active' : ''}`}
-          onClick={() => setUpcomingOnly((v) => !v)}
+          onClick={() => { setUpcomingOnly((v) => !v); resetPage() }}
           aria-pressed={upcomingOnly}
         >
           Upcoming
@@ -330,7 +335,7 @@ export default function Flyers() {
         <select
           className="filter-select"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
+          onChange={(e) => { setSortBy(e.target.value); resetPage() }}
           aria-label="Sort"
         >
           <option value="uploaded_desc">Newest</option>
@@ -351,6 +356,7 @@ export default function Flyers() {
             setDateTo('')
             setUpcomingOnly(false)
             setSortBy('uploaded_desc')
+            resetPage()
           }}
           disabled={!search && !venueSearch && !city && genres.length === 0 && !dateFrom && !dateTo && !upcomingOnly && sortBy === 'uploaded_desc'}
         >
@@ -384,7 +390,7 @@ export default function Flyers() {
           </article>
         )}
 
-        {filteredFlyers.map((flyer) => (
+        {filteredFlyers.slice(0, visibleCount).map((flyer) => (
           <article
             key={flyer.id}
             className="dash-card flyer-card"
@@ -425,6 +431,18 @@ export default function Flyers() {
           </article>
         ))}
       </section>
+
+      {visibleCount < filteredFlyers.length && (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+          >
+            Load more
+          </button>
+        </div>
+      )}
 
       {selectedFlyer && (
         <div
