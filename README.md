@@ -1,4 +1,4 @@
-# Goofy Ravers
+# BPM Index
 
 A community platform for the Arizona underground rave and electronic music scene. Upload event flyers, discover venues on an interactive map, and connect with the local scene.
 
@@ -6,7 +6,7 @@ Built for the hackathon by **Team Goofy Goners**.
 
 ## Demo
 
-[![Goofy Ravers Demo](https://img.youtube.com/vi/onuT4owwBTg/maxresdefault.jpg)](https://youtu.be/onuT4owwBTg)
+[![BPM Index Demo](https://img.youtube.com/vi/onuT4owwBTg/maxresdefault.jpg)](https://youtu.be/onuT4owwBTg)
 
 ## Features
 

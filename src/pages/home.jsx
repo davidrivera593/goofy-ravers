@@ -130,8 +130,8 @@ export default function Home() {
         <div className="auth-grid" />
         <div className="auth-card">
           <div className="auth-logo">
-            <div className="auth-logo-mark">GR</div>
-            <span className="auth-logo-text">Goofy Ravers</span>
+            <div className="auth-logo-mark">BPM</div>
+            <span className="auth-logo-text">BPM Index</span>
           </div>
 
           <h1>One last step</h1>
@@ -169,8 +169,8 @@ export default function Home() {
 
         <div className="auth-card">
           <div className="auth-logo">
-            <div className="auth-logo-mark">GR</div>
-            <span className="auth-logo-text">Goofy Ravers</span>
+            <div className="auth-logo-mark">BPM</div>
+            <span className="auth-logo-text">BPM Index</span>
           </div>
 
           <h1>Redirecting...</h1>
@@ -185,8 +185,8 @@ export default function Home() {
       <div className="auth-grid" />
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="auth-logo-mark">GR</div>
-          <span className="auth-logo-text">Goofy Ravers</span>
+          <div className="auth-logo-mark">BPM</div>
+          <span className="auth-logo-text">BPM Index</span>
         </div>
 
         <h1>{mode === 'login' ? 'Welcome back' : 'Join the scene'}</h1>

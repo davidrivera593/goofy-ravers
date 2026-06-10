@@ -53,8 +53,8 @@ export default function AppLayout({ title, subtitle, headerAction, user, childre
     <div className="dashboard">
       <nav className="dashboard-nav">
         <Link className="nav-logo" to={isLoggedIn ? '/dashboard' : '/flyers'}>
-          <div className="nav-logo-mark">GR</div>
-          <span className="nav-logo-text">GOOFY RAVERS</span>
+          <div className="nav-logo-mark">BPM</div>
+          <span className="nav-logo-text">BPM INDEX</span>
         </Link>
 
         <div className="nav-links">
