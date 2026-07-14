@@ -306,7 +306,7 @@ export default function Profile() {
   function getSoundCloudPlayerSrc(trackUrl) {
     if (!trackUrl || !isSoundCloudUrl(trackUrl)) return ''
     const url = encodeURIComponent(trackUrl)
-    return `https://w.soundcloud.com/player/?url=${url}&color=%23f5e214&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false`
+    return `https://w.soundcloud.com/player/?url=${url}&color=%23A85CFF&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false`
   }
 
   async function handleSave() {

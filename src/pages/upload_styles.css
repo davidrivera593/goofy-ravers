@@ -184,9 +184,9 @@
 }
 
 .upload-banner.error {
-  background: var(--magenta-dim);
-  border: 1px solid var(--magenta);
-  color: var(--magenta);
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  color: var(--danger);
 }
 
 .upload-banner-dot {

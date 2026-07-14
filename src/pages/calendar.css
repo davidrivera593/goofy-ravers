@@ -309,7 +309,7 @@
 }
 
 .cal-card:hover {
-  border-color: rgba(245, 226, 20, 0.2);
+  border-color: rgba(168, 92, 255, 0.2);
   transform: translateY(-2px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }

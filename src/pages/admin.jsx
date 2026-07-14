@@ -211,7 +211,7 @@ export default function Admin() {
                         borderRadius: '4px',
                         fontSize: '11px',
                         background: u.role === 'admin' ? 'var(--magenta)' : u.role === 'moderator' ? 'var(--cyan)' : 'var(--surface-2)',
-                        color: u.role === 'admin' ? '#fff' : u.role === 'moderator' ? '#000' : 'var(--text)',
+                        color: u.role === 'admin' ? '#0a0a10' : u.role === 'moderator' ? '#0a0a10' : 'var(--text)',
                       }}>
                         {u.role || 'user'}
                       </span>

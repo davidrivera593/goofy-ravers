@@ -45,20 +45,20 @@
 
 .map-marker-venue {
   background: var(--cyan);
-  color: #080a0f;
-  border-color: rgba(245, 226, 20, 0.5);
+  color: #0a0a10;
+  border-color: rgba(168, 92, 255, 0.5);
 }
 
 .map-marker-spot {
   background: var(--magenta);
-  color: #fff;
-  border-color: rgba(20, 39, 245, 0.5);
+  color: #0a0a10;
+  border-color: rgba(51, 240, 194, 0.5);
 }
 
 .map-marker-event {
   background: var(--amber);
-  color: #080a0f;
-  border-color: rgba(245, 162, 20, 0.5);
+  color: #0a0a10;
+  border-color: rgba(255, 122, 26, 0.5);
 }
 
 /* ── Side panel ── */
@@ -114,14 +114,14 @@
 
 .map-panel-type-spot {
   background: var(--magenta-dim);
-  color: #8090ff;
-  border: 1px solid rgba(20, 39, 245, 0.3);
+  color: var(--magenta);
+  border: 1px solid rgba(51, 240, 194, 0.3);
 }
 
 .map-panel-type-event {
-  background: rgba(245, 162, 20, 0.12);
+  background: rgba(255, 122, 26, 0.12);
   color: var(--amber);
-  border: 1px solid rgba(245, 162, 20, 0.3);
+  border: 1px solid rgba(255, 122, 26, 0.3);
 }
 
 .map-panel-title {
@@ -218,7 +218,7 @@
 .map-add-form input:focus,
 .map-add-form select:focus {
   border-color: var(--border-bright);
-  background-image: radial-gradient(rgba(245,226,20,0.14) 0.7px, transparent 0.8px);
+  background-image: radial-gradient(rgba(168,92,255,0.14) 0.7px, transparent 0.8px);
   background-size: 6px 6px;
 }
 
@@ -290,7 +290,7 @@
 }
 
 .map-panel-event-card:hover {
-  border-color: rgba(245, 226, 20, 0.2);
+  border-color: rgba(168, 92, 255, 0.2);
 }
 
 .map-panel-event-img {
@@ -366,7 +366,7 @@
 }
 
 .map-legend-venue { color: var(--cyan); }
-.map-legend-spot  { color: #8090ff; }
+.map-legend-spot  { color: var(--magenta); }
 .map-legend-event { color: var(--amber); }
 
 /* ── Responsive ── */

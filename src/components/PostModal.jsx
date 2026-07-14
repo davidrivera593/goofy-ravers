@@ -432,7 +432,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             disabled={!reportReason}
             style={{
               background: reportReason ? 'var(--magenta)' : 'var(--surface-2)',
-              color: '#fff',
+              color: reportReason ? '#0a0a10' : 'var(--text)',
               border: 'none',
               borderRadius: '4px',
               padding: '4px 12px',
