@@ -36,6 +36,7 @@ export default function Upload() {
   const [status, setStatus] = useState('idle') // idle | parsing | uploading | done | error
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const [useClaude, setUseClaude] = useState(true)
 
   // ── Load existing flyer when editing ──────────────────────────────
   useEffect(() => {
@@ -73,7 +74,18 @@ export default function Upload() {
     setErrorMsg('')
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
-    parseWithClaude(file)
+    if (useClaude) parseWithClaude(file)
+  }
+
+  // Flipping the switch on with an image already selected parses it —
+  // but never overwrites details the user has already typed in.
+  function handleClaudeToggle() {
+    const next = !useClaude
+    setUseClaude(next)
+    const formIsEmpty = !form.title.trim() && !form.date.trim() && !form.venue.trim() && !form.djs.trim()
+    if (next && imageFile && formIsEmpty && status !== 'parsing' && status !== 'uploading') {
+      parseWithClaude(imageFile)
+    }
   }
 
   function handleFileInput(e) {
@@ -191,12 +203,16 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
       } else {
         // ── Create new flyer ─────────────────────────────────────────
         let avatarUrl = ''
+        let profileName = ''
         try {
           const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
-          if (userSnap.exists()) avatarUrl = userSnap.data().avatarUrl || ''
-        } catch (_) { /* non-fatal */ }
+          if (userSnap.exists()) {
+            avatarUrl = userSnap.data().avatarUrl || ''
+            profileName = userSnap.data().displayName || ''
+          }
+        } catch { /* non-fatal */ }
 
-        const payload = buildFlyerPayload({ form, currentUser, imageUrl: newImageUrl, avatarUrl })
+        const payload = buildFlyerPayload({ form, currentUser, imageUrl: newImageUrl, avatarUrl, profileName })
         const docRef = await addDoc(collection(db, 'flyers'), payload)
 
         if (!docRef?.id) throw new Error('Firebase did not return a document id.')
@@ -221,10 +237,12 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
     <AppLayout
       user={currentUser}
       title={editId ? 'Edit Flyer' : 'Upload Flyer'}
-      subtitle={editId ? 'Update the event details below.' : 'Drop your flyer image — Claude will auto-fill the details.'}
+      subtitle={editId ? 'Update the event details below.' : 'Drop your flyer image — flip the ✨ switch and Claude fills in the details.'}
     >
       <div className="upload-page">
         <form className="upload-form" onSubmit={handleSubmit}>
+          <div className={`upload-layout${(imagePreview || editId) ? ' upload-layout-two-col' : ''}`}>
+          <div className="upload-side">
 
           {/* ── Drop zone ── */}
           <div
@@ -277,6 +295,28 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
             />
           </div>
 
+          {/* ── Claude parse toggle ── */}
+          <label className="upload-claude-row" onClick={handleClaudeToggle}>
+            <span
+              role="switch"
+              aria-checked={useClaude}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleClaudeToggle()
+                }
+              }}
+              className={`feed-toggle-track${useClaude ? ' feed-toggle-track--on' : ''}`}
+            >
+              <span className={`feed-toggle-thumb${useClaude ? ' feed-toggle-thumb--on' : ''}`} />
+            </span>
+            <span className="upload-claude-label">
+              <strong>✨ Parse with Claude</strong>
+              <span>Auto-fills the event details from your flyer image.</span>
+            </span>
+          </label>
+
           {/* ── Status banner ── */}
           {status === 'parsing' && (
             <div className="upload-banner parsing">
@@ -298,6 +338,8 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
           {errorMsg && (
             <div className="upload-banner error">{errorMsg}</div>
           )}
+
+          </div>{/* /upload-side */}
 
           {/* ── Form fields ── */}
           {(imagePreview || editId) && (
@@ -449,6 +491,7 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
               </div>
             </div>
           )}
+          </div>{/* /upload-layout */}
         </form>
       </div>
     </AppLayout>
@@ -497,11 +540,12 @@ function buildEditPayload({ form, imageUrl }) {
   return payload
 }
 
-function buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl }) {
+function buildFlyerPayload({ form, currentUser, imageUrl, avatarUrl, profileName }) {
   return {
     imageUrl,
     uploadedBy: currentUser.uid,
-    uploadedByName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver',
+    // Prefer the chosen username from Firestore — never fall back to the email
+    uploadedByName: profileName || currentUser.displayName || 'Raver',
     uploadedByAvatar: avatarUrl || '',
     uploadedAt: serverTimestamp(),
     title: form.title.trim(),

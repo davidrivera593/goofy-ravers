@@ -22,12 +22,14 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-function AdminRoute({ children }) {
-  const { isAuthenticated, isAdmin, loading } = useAuth()
+// Admins and moderators can access the moderation dashboard;
+// admin-only actions are gated inside the page itself.
+function ModRoute({ children }) {
+  const { isAuthenticated, isMod, loading } = useAuth()
 
   if (loading) return null
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated || !isMod) {
     return <Navigate to="/dashboard" replace />
   }
 
@@ -67,13 +69,13 @@ export default function App() {
             }
           />
 
-          {/* Admin-only route */}
+          {/* Admin/moderator route */}
           <Route
             path="/admin"
             element={
-              <AdminRoute>
+              <ModRoute>
                 <Admin />
-              </AdminRoute>
+              </ModRoute>
             }
           />
         </Routes>

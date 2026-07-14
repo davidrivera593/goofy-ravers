@@ -29,7 +29,7 @@ const INITIAL_VIEW = {
 const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11'
 
 export default function MapPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, userDoc } = useAuth()
   const [locations, setLocations] = useState([])
   const [flyers, setFlyers] = useState([])
   const [selectedLocation, setSelectedLocation] = useState(null)
@@ -231,8 +231,9 @@ Respond with ONLY the vibe check text. No preamble, no quotes.`,
     setPinError('')
 
     try {
+      // Prefer the chosen username from Firestore — never fall back to the email
       const addedByName =
-        currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver'
+        userDoc?.displayName || currentUser.displayName || 'Raver'
 
       const payload = {
         lat: draftPin.lat,

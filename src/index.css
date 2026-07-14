@@ -2548,3 +2548,246 @@ a.post-modal-name-link:hover {
     max-height: 40svh;
   }
 }
+
+/* ── Composer: multi-image grid ── */
+.feed-compose-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 8px 0 0 46px;
+}
+
+.feed-compose-image-cell {
+  margin: 0;
+  max-width: none;
+}
+
+.feed-compose-image-cell img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* ── Composer: @mention autocomplete ── */
+.feed-compose-textarea-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-compose-textarea-wrap .feed-compose-textarea {
+  width: 100%;
+}
+
+.feed-compose-mentions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border-bright, var(--border));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.feed-compose-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feed-compose-mention-item:hover {
+  background: var(--surface-2);
+  color: var(--cyan);
+}
+
+.feed-compose-mention-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.feed-compose-mention-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Composer: Claude parse toggle ── */
+.feed-compose-claude-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.feed-compose-claude-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.feed-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.feed-toggle-track--on {
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.feed-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s, background 0.15s;
+  display: block;
+}
+
+.feed-toggle-thumb--on {
+  transform: translateX(16px);
+  background: #000;
+}
+
+/* ── Feed cards: multi-image badge + mention links + Claude tags ── */
+.feed-post-status-image-wrap {
+  position: relative;
+}
+
+.feed-post-image-count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.feed-mention-link {
+  color: var(--cyan);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.feed-mention-link:hover {
+  text-decoration: underline;
+}
+
+.feed-tag-claude {
+  border: 1px dashed var(--cyan);
+}
+
+/* ── Post modal: image carousel ── */
+.post-modal-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.post-modal-carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.post-modal-carousel-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.post-modal-carousel-prev { left: 10px; }
+.post-modal-carousel-next { right: 10px; }
+
+.post-modal-carousel-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+
+.post-modal-carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+}
+
+.post-modal-carousel-dot.active {
+  background: #fff;
+}
+
+/* ── Post modal: comment delete ── */
+.post-modal-comment-delete {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.post-modal-comment-delete:hover {
+  color: var(--magenta);
+}

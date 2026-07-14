@@ -18,6 +18,7 @@ import {
 import { deleteObject, ref as storageRef } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
+import { renderTextWithMentions } from '../lib/mentions'
 
 function extractYouTubeId(url) {
   if (!url) return null
@@ -37,7 +38,7 @@ const REPORT_REASONS = ['Spam', 'Inappropriate', 'Harassment', 'Other']
 
 export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
   const navigate = useNavigate()
-  const { isMod, isAdmin } = useAuth()
+  const { isMod, isAdmin, userDoc } = useAuth()
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -49,6 +50,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   const [showReport, setShowReport] = useState(false)
   const [reportReason, setReportReason] = useState('')
   const [reported, setReported] = useState(false)
+  const [imageIndex, setImageIndex] = useState(0)
   const inputRef = useRef(null)
 
   const liked = currentUser && Array.isArray(post.likes) && post.likes.includes(currentUser.uid)
@@ -116,14 +118,14 @@ export default function PostModal({ post, collection: colName, currentUser, avat
     if (!commentText.trim() || !currentUser) return
     setSubmitting(true)
     try {
-      const posterName =
-        currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver'
+      // Prefer the chosen username from Firestore — never fall back to the email
+      const posterName = userDoc?.displayName || currentUser.displayName || 'Raver'
       const postDocRef = doc(db, colName, post.id)
       await addDoc(collection(db, colName, post.id, 'comments'), {
         text: commentText.trim(),
         authorId: currentUser.uid,
         authorName: posterName,
-        authorAvatar: avatarCache[currentUser.uid] || '',
+        authorAvatar: userDoc?.avatarUrl || avatarCache[currentUser.uid] || '',
         createdAt: serverTimestamp(),
       })
       await updateDoc(postDocRef, { commentCount: increment(1) })
@@ -132,6 +134,20 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       console.error('Comment failed:', err)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Comment author or a mod/admin can remove a comment
+  async function handleDeleteComment(comment) {
+    if (!currentUser) return
+    const canRemove = comment.authorId === currentUser.uid || canModerate
+    if (!canRemove) return
+    if (!confirm('Delete this comment?')) return
+    try {
+      await deleteDoc(doc(db, colName, post.id, 'comments', comment.id))
+      await updateDoc(doc(db, colName, post.id), { commentCount: increment(-1) })
+    } catch (err) {
+      console.error('Delete comment failed:', err)
     }
   }
 
@@ -155,15 +171,18 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       const deletePromises = commentsSnap.docs.map((d) => deleteDoc(d.ref))
       await Promise.all(deletePromises)
 
-      // Try to delete the image from Storage if it exists
-      if (post.imageUrl) {
-        try {
-          const imageRef = storageRef(storage, post.imageUrl)
-          await deleteObject(imageRef)
-        } catch {
-          // Image may not exist in storage or URL format may differ — ignore
-        }
-      }
+      // Try to delete all attached images from Storage if they exist
+      const imageUrls = [
+        ...(Array.isArray(post.imageUrls) ? post.imageUrls : []),
+        ...(post.imageUrl ? [post.imageUrl] : []),
+      ]
+      await Promise.all(
+        [...new Set(imageUrls)].map((url) =>
+          deleteObject(storageRef(storage, url)).catch(() => {
+            // Image may not exist in storage or URL format may differ — ignore
+          })
+        )
+      )
 
       // Delete the post document
       await deleteDoc(doc(db, colName, post.id))
@@ -200,7 +219,11 @@ export default function PostModal({ post, collection: colName, currentUser, avat
   const posterName = post.uploadedByName || 'Raver'
   const posterAvatar = post.uploadedByAvatar || avatarCache[post.uploadedBy] || ''
   const ytVideoId = extractYouTubeId(post.youtubeUrl)
-  const hasImage = Boolean(post.imageUrl) || Boolean(ytVideoId)
+  const postImages = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+    ? post.imageUrls
+    : post.imageUrl ? [post.imageUrl] : []
+  const safeImageIndex = Math.min(imageIndex, postImages.length - 1)
+  const hasImage = postImages.length > 0 || Boolean(ytVideoId)
 
   const rightPanel = (
     <div className="post-modal-right">
@@ -236,7 +259,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
                 className="post-modal-edit-textarea"
                 value={editText}
                 onChange={e => setEditText(e.target.value)}
-                maxLength={500}
+                maxLength={1000}
                 autoFocus
               />
               <div className="post-modal-edit-actions">
@@ -249,7 +272,16 @@ export default function PostModal({ post, collection: colName, currentUser, avat
               </div>
             </div>
           ) : (
-            <p className="post-modal-status-text">{displayText}</p>
+            <>
+              <p className="post-modal-status-text">
+                {renderTextWithMentions(displayText, post.taggedUsers, { onLinkClick: onClose })}
+              </p>
+              {Array.isArray(post.claudeTags) && post.claudeTags.length > 0 && (
+                <div className="post-modal-tags">
+                  {post.claudeTags.map((t) => <span key={t} className="feed-tag feed-tag-claude">#{t}</span>)}
+                </div>
+              )}
+            </>
           )
         ) : (
           <>
@@ -435,6 +467,7 @@ export default function PostModal({ post, collection: colName, currentUser, avat
         )}
         {comments.map((c) => {
           const cAvatar = c.authorAvatar || avatarCache[c.authorId] || ''
+          const canRemoveComment = currentUser && (c.authorId === currentUser.uid || canModerate)
           return (
           <div key={c.id} className="post-modal-comment">
             <div className="post-modal-comment-avatar">
@@ -447,6 +480,17 @@ export default function PostModal({ post, collection: colName, currentUser, avat
               <span className="post-modal-comment-author">{c.authorName || 'Raver'}</span>
               <p className="post-modal-comment-text">{c.text}</p>
             </div>
+            {canRemoveComment && (
+              <button
+                type="button"
+                className="post-modal-comment-delete"
+                onClick={() => handleDeleteComment(c)}
+                aria-label="Delete comment"
+                title="Delete comment"
+              >
+                ✕
+              </button>
+            )}
           </div>
           )
         })}
@@ -456,9 +500,9 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       {currentUser && (
         <form className="post-modal-compose" onSubmit={handleComment}>
           <div className="post-modal-compose-avatar">
-            {avatarCache[currentUser.uid]
-              ? <img src={avatarCache[currentUser.uid]} alt="" className="post-modal-comment-avatar-img" />
-              : (currentUser.displayName || currentUser.email || 'R')[0].toUpperCase()
+            {(userDoc?.avatarUrl || avatarCache[currentUser.uid])
+              ? <img src={userDoc?.avatarUrl || avatarCache[currentUser.uid]} alt="" className="post-modal-comment-avatar-img" />
+              : (userDoc?.displayName || currentUser.displayName || 'R')[0].toUpperCase()
             }
           </div>
           <input
@@ -493,8 +537,47 @@ export default function PostModal({ post, collection: colName, currentUser, avat
       >
         {hasImage && (
           <div className="post-modal-left">
-            {post.imageUrl
-              ? <img src={post.imageUrl} alt={post.title || 'Post image'} className="post-modal-image" />
+            {postImages.length > 0
+              ? (
+                <div className="post-modal-carousel">
+                  <img
+                    src={postImages[safeImageIndex]}
+                    alt={post.title || `Post image ${safeImageIndex + 1}`}
+                    className="post-modal-image"
+                  />
+                  {postImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className="post-modal-carousel-btn post-modal-carousel-prev"
+                        onClick={() => setImageIndex((i) => (i - 1 + postImages.length) % postImages.length)}
+                        aria-label="Previous image"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        className="post-modal-carousel-btn post-modal-carousel-next"
+                        onClick={() => setImageIndex((i) => (i + 1) % postImages.length)}
+                        aria-label="Next image"
+                      >
+                        ›
+                      </button>
+                      <div className="post-modal-carousel-dots">
+                        {postImages.map((url, i) => (
+                          <button
+                            key={url}
+                            type="button"
+                            className={`post-modal-carousel-dot${i === safeImageIndex ? ' active' : ''}`}
+                            onClick={() => setImageIndex(i)}
+                            aria-label={`Go to image ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
               : <div className="post-modal-youtube">
                   <iframe
                     src={`https://www.youtube.com/embed/${ytVideoId}`}

@@ -1,18 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
   where,
 } from 'firebase/firestore'
+import { deleteObject, ref as storageRef } from 'firebase/storage'
 import { httpsCallable } from 'firebase/functions'
-import { db, functions } from '../firebase/config'
+import { db, functions, storage } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 
@@ -20,15 +21,19 @@ const setUserRoleFn = httpsCallable(functions, 'setUserRole')
 const banUserFn = httpsCallable(functions, 'banUser')
 
 export default function Admin() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isAdmin } = useAuth()
   const [users, setUsers] = useState([])
   const [reports, setReports] = useState([])
+  const [reportsError, setReportsError] = useState('')
   const [reportContent, setReportContent] = useState({}) // reportId → content doc
   const [actionLoading, setActionLoading] = useState({}) // id → true
-  const [activeTab, setActiveTab] = useState('users') // 'users' | 'reports'
+  // Moderators only see the reports tab; user management is admin-only
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'users' : 'reports')
+  const fetchedContentIds = useRef(new Set())
 
-  // Subscribe to all users
+  // Subscribe to all users (admin-only tab)
   useEffect(() => {
+    if (!isAdmin) return
     return onSnapshot(collection(db, 'users'), (snap) => {
       setUsers(
         snap.docs
@@ -36,22 +41,24 @@ export default function Admin() {
           .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''))
       )
     })
-  }, [])
+  }, [isAdmin])
 
-  // Subscribe to pending reports
+  // Subscribe to pending reports.
+  // No orderBy here — a where + orderBy combo needs a composite index and
+  // fails silently if it's missing. Sort client-side instead.
   useEffect(() => {
-    const q = query(
-      collection(db, 'reports'),
-      where('status', '==', 'pending'),
-      orderBy('reportedAt', 'desc')
-    )
+    const q = query(collection(db, 'reports'), where('status', '==', 'pending'))
     return onSnapshot(q, (snap) => {
-      const reps = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      const reps = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.reportedAt?.toMillis?.() ?? 0) - (a.reportedAt?.toMillis?.() ?? 0))
       setReports(reps)
+      setReportsError('')
 
       // Load referenced content for each report
       reps.forEach(async (r) => {
-        if (reportContent[r.id]) return
+        if (fetchedContentIds.current.has(r.id)) return
+        fetchedContentIds.current.add(r.id)
         try {
           const contentDoc = await getDoc(doc(db, r.collectionPath, r.contentId))
           if (contentDoc.exists()) {
@@ -61,6 +68,9 @@ export default function Admin() {
           // Content may have been deleted
         }
       })
+    }, (err) => {
+      console.error('Failed to load reports:', err)
+      setReportsError('Could not load reports. Check your permissions and try again.')
     })
   }, [])
 
@@ -105,7 +115,29 @@ export default function Admin() {
   async function handleDeleteContent(report) {
     if (!confirm('Delete this content? This cannot be undone.')) return
     try {
-      await deleteDoc(doc(db, report.collectionPath, report.contentId))
+      const contentRef = doc(db, report.collectionPath, report.contentId)
+
+      // Delete comments subcollection so it doesn't orphan
+      try {
+        const commentsSnap = await getDocs(collection(db, report.collectionPath, report.contentId, 'comments'))
+        await Promise.all(commentsSnap.docs.map((d) => deleteDoc(d.ref)))
+      } catch {
+        // Content may already be gone
+      }
+
+      // Delete any attached images from Storage
+      const content = reportContent[report.id]
+      const imageUrls = [
+        ...(Array.isArray(content?.imageUrls) ? content.imageUrls : []),
+        ...(content?.imageUrl ? [content.imageUrl] : []),
+      ]
+      await Promise.all(
+        [...new Set(imageUrls)].map((url) =>
+          deleteObject(storageRef(storage, url)).catch(() => {})
+        )
+      )
+
+      await deleteDoc(contentRef)
       await updateDoc(doc(db, 'reports', report.id), {
         status: 'actioned',
         reviewedBy: currentUser.uid,
@@ -129,19 +161,21 @@ export default function Admin() {
   })
 
   return (
-    <AppLayout title="Admin Dashboard" user={currentUser}>
+    <AppLayout title={isAdmin ? 'Admin Dashboard' : 'Moderation'} user={currentUser}>
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-        <button style={tabStyle('users')} onClick={() => setActiveTab('users')}>
-          Users ({users.length})
-        </button>
+        {isAdmin && (
+          <button style={tabStyle('users')} onClick={() => setActiveTab('users')}>
+            Users ({users.length})
+          </button>
+        )}
         <button style={tabStyle('reports')} onClick={() => setActiveTab('reports')}>
           Reports ({reports.length})
         </button>
       </div>
 
       {/* ── Users Tab ─────────────────────────────────────────────── */}
-      {activeTab === 'users' && (
+      {activeTab === 'users' && isAdmin && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: '13px' }}>
             <thead>
@@ -237,7 +271,12 @@ export default function Admin() {
       {/* ── Reports Tab ───────────────────────────────────────────── */}
       {activeTab === 'reports' && (
         <div>
-          {reports.length === 0 && (
+          {reportsError && (
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: '#f44', textAlign: 'center', padding: '20px 0' }}>
+              {reportsError}
+            </p>
+          )}
+          {!reportsError && reports.length === 0 && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '14px', opacity: 0.6, textAlign: 'center', padding: '40px 0' }}>
               No pending reports
             </p>
@@ -274,7 +313,7 @@ export default function Admin() {
                   </span>
                 </div>
 
-                {content && (
+                {content ? (
                   <div style={{
                     padding: '8px 12px', borderRadius: '6px',
                     background: 'var(--surface-2)', marginBottom: '12px',
@@ -286,6 +325,10 @@ export default function Admin() {
                       by {content.uploadedByName || 'Unknown'}
                     </p>
                   </div>
+                ) : (
+                  <p style={{ fontFamily: 'var(--mono)', fontSize: '12px', opacity: 0.5, marginBottom: '12px' }}>
+                    Content unavailable — it may have already been deleted.
+                  </p>
                 )}
 
                 <div style={{ display: 'flex', gap: '8px' }}>

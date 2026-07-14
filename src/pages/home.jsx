@@ -6,9 +6,11 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  updateProfile,
 } from 'firebase/auth'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
+import { isUsernameTaken, validateUsername } from '../lib/username'
 
 const googleProvider = new GoogleAuthProvider()
 
@@ -43,9 +45,12 @@ export default function Home() {
     setMessage('')
     setIsSuccess(false)
 
-    if (mode === 'signup' && !username.trim()) {
-      setMessage('Please choose a username.')
-      return
+    if (mode === 'signup') {
+      const usernameError = validateUsername(username)
+      if (usernameError) {
+        setMessage(usernameError)
+        return
+      }
     }
 
     if (mode === 'signup' && password !== confirmPassword) {
@@ -56,13 +61,22 @@ export default function Home() {
     try {
       setLoading(true)
       if (mode === 'signup') {
+        if (await isUsernameTaken(username)) {
+          setMessage('That username is taken. Try another.')
+          setLoading(false)
+          return
+        }
         const { user } = await createUserWithEmailAndPassword(auth, email, password)
+        const displayName = username.trim()
         await setDoc(doc(db, 'users', user.uid), {
-          displayName: username.trim(),
+          displayName,
+          displayNameLower: displayName.toLowerCase(),
           bio: '',
           avatarUrl: '',
           createdAt: serverTimestamp(),
         })
+        // Keep the Auth profile in sync so the app never falls back to the email
+        await updateProfile(user, { displayName }).catch(() => {})
         setMessage('Account created.')
       } else {
         await signInWithEmailAndPassword(auth, email, password)
@@ -95,6 +109,9 @@ export default function Home() {
         setPendingGoogleUser(result.user)
       }
     } catch (error) {
+      // If the popup was closed/failed, don't leave the redirect suppressed —
+      // otherwise a later email login strands the user on the auth page.
+      suppressRedirect.current = false
       setMessage(error.message)
     } finally {
       setLoading(false)
@@ -103,16 +120,30 @@ export default function Home() {
 
   async function handleGoogleUsernameSubmit(e) {
     e.preventDefault()
-    if (!googleUsername.trim()) return
+    const usernameError = validateUsername(googleUsername)
+    if (usernameError) {
+      setMessage(usernameError)
+      return
+    }
     setLoading(true)
     setMessage('')
     try {
+      if (await isUsernameTaken(googleUsername, pendingGoogleUser.uid)) {
+        setMessage('That username is taken. Try another.')
+        setLoading(false)
+        return
+      }
+      const displayName = googleUsername.trim()
       await setDoc(doc(db, 'users', pendingGoogleUser.uid), {
-        displayName: googleUsername.trim(),
+        displayName,
+        displayNameLower: displayName.toLowerCase(),
         bio: '',
         avatarUrl: '',
         createdAt: serverTimestamp(),
       })
+      // Google sets displayName to the account's real name — overwrite it
+      // with the chosen username so the app never shows the wrong name.
+      await updateProfile(pendingGoogleUser, { displayName }).catch(() => {})
       suppressRedirect.current = false
       setPendingGoogleUser(null)
       setGoogleUsername('')

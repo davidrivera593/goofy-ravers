@@ -19,29 +19,32 @@ const AUTH_LINKS = [
 
 export default function AppLayout({ title, subtitle, headerAction, user, children }) {
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isMod, userDoc } = useAuth()
   const [avatarUrl, setAvatarUrl] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
 
   const isLoggedIn = Boolean(user)
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'Raver'
+  // Prefer the chosen username from Firestore — never fall back to the email
+  const displayName = userDoc?.displayName || user?.displayName || 'Raver'
   const initials = isLoggedIn ? displayName[0].toUpperCase() : '?'
 
   // Build nav links based on auth state
   const navLinks = [
     ...PUBLIC_LINKS,
     ...(isLoggedIn ? AUTH_LINKS : []),
-    ...(isAdmin ? [{ label: 'Admin', path: '/admin' }] : []),
+    ...(isMod ? [{ label: isAdmin ? 'Admin' : 'Moderation', path: '/admin' }] : []),
   ]
 
   // Listen to user doc for avatar
   useEffect(() => {
-    if (!user?.uid) { setAvatarUrl(''); return }
-    return onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) {
-        setAvatarUrl(snap.data().avatarUrl || '')
-      }
+    if (!user?.uid) return undefined
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      setAvatarUrl(snap.exists() ? snap.data().avatarUrl || '' : '')
     })
+    return () => {
+      unsubscribe()
+      setAvatarUrl('')
+    }
   }, [user?.uid])
 
   async function handleLogout() {

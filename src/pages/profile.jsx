@@ -12,11 +12,14 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
-import { db, storage } from '../firebase/config'
+import { updateProfile } from 'firebase/auth'
+import { auth, db, storage } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
+import { isUsernameTaken, validateUsername } from '../lib/username'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import StatusComposer from '../components/StatusComposer'
+import { renderTextWithMentions } from '../lib/mentions'
 
 const STATUS_COLLAPSE_CHARS = 180
 
@@ -145,14 +148,22 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
     : post.text
   const ytVideoId = extractYouTubeId(post.youtubeUrl)
+  const images = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+    ? post.imageUrls
+    : post.imageUrl ? [post.imageUrl] : []
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
         <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
-        {post.imageUrl && (
-          <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
+        {images.length > 0 && (
+          <div className="feed-post-status-image-wrap">
+            <img src={images[0]} alt="Post image" className="feed-post-status-image" />
+            {images.length > 1 && (
+              <span className="feed-post-image-count">+{images.length - 1}</span>
+            )}
+          </div>
         )}
-        {!post.imageUrl && ytVideoId && (
+        {images.length === 0 && ytVideoId && (
           <div className="feed-post-youtube-thumb">
             <img
               src={`https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg`}
@@ -162,9 +173,16 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
           </div>
         )}
         <div className="feed-post-status-text-wrap feed-post-status-collapsed">
-          <p className="feed-post-status-text">{displayText}</p>
+          <p className="feed-post-status-text">
+            {renderTextWithMentions(displayText, post.taggedUsers)}
+          </p>
           {isLong && <div className="feed-post-status-fade" />}
         </div>
+        {Array.isArray(post.claudeTags) && post.claudeTags.length > 0 && (
+          <div className="feed-post-tags">
+            {post.claudeTags.map((t) => <span key={t} className="feed-tag feed-tag-claude">#{t}</span>)}
+          </div>
+        )}
         <CardCounts post={post} />
       </div>
     </article>
@@ -205,12 +223,12 @@ export default function Profile() {
     return onSnapshot(userDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data()
-        setDisplayName(data.displayName || currentUser.email?.split('@')[0] || 'Raver')
+        setDisplayName(data.displayName || 'Raver')
         setBio(data.bio || '')
         setAvatarUrl(data.avatarUrl || '')
         setFavoriteTrackUrl(data.favoriteTrackUrl || '')
       } else {
-        setDisplayName(currentUser.displayName || currentUser.email?.split('@')[0] || 'Raver')
+        setDisplayName(currentUser.displayName || 'Raver')
         setBio('')
         setAvatarUrl('')
         setFavoriteTrackUrl('')
@@ -305,10 +323,23 @@ export default function Profile() {
 
       const newName = draftName.trim()
 
+      const usernameError = validateUsername(newName)
+      if (usernameError) {
+        setSaveMsg(usernameError)
+        setIsSaving(false)
+        return
+      }
+      if (newName !== displayName && (await isUsernameTaken(newName, currentUser.uid))) {
+        setSaveMsg('That username is taken. Try another.')
+        setIsSaving(false)
+        return
+      }
+
       await setDoc(
         doc(db, 'users', currentUser.uid),
         {
           displayName: newName,
+          displayNameLower: newName.toLowerCase(),
           bio: draftBio.trim(),
           favoriteTrackUrl: cleanedTrackUrl,
           updatedAt: serverTimestamp(),
@@ -318,11 +349,19 @@ export default function Profile() {
 
       // Propagate new name to all existing posts and flyers
       if (newName !== displayName) {
-        const batch = writeBatch(db)
-        ;[...flyers, ...statusPosts].forEach((post) => {
-          batch.update(doc(db, post._col, post.id), { uploadedByName: newName })
-        })
-        await batch.commit()
+        // Keep the Auth profile in sync so the app never falls back to the email
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: newName }).catch(() => {})
+        }
+        // Firestore batches cap at 500 operations — chunk to stay under it
+        const allPosts = [...flyers, ...statusPosts]
+        for (let i = 0; i < allPosts.length; i += 450) {
+          const batch = writeBatch(db)
+          allPosts.slice(i, i + 450).forEach((post) => {
+            batch.update(doc(db, post._col, post.id), { uploadedByName: newName })
+          })
+          await batch.commit()
+        }
       }
 
       setIsEditing(false)

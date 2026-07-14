@@ -5,6 +5,7 @@ import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
+import { renderTextWithMentions } from '../lib/mentions'
 
 const STATUS_COLLAPSE_CHARS = 180
 
@@ -130,14 +131,22 @@ function StatusPost({ post, onClick, name, avatar }) {
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
     : post.text
   const ytVideoId = extractYouTubeId(post.youtubeUrl)
+  const images = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+    ? post.imageUrls
+    : post.imageUrl ? [post.imageUrl] : []
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
         <PostHeader post={post} name={name} avatar={avatar} />
-        {post.imageUrl && (
-          <img src={post.imageUrl} alt="Post image" className="feed-post-status-image" />
+        {images.length > 0 && (
+          <div className="feed-post-status-image-wrap">
+            <img src={images[0]} alt="Post image" className="feed-post-status-image" />
+            {images.length > 1 && (
+              <span className="feed-post-image-count">+{images.length - 1}</span>
+            )}
+          </div>
         )}
-        {!post.imageUrl && ytVideoId && (
+        {images.length === 0 && ytVideoId && (
           <div className="feed-post-youtube-thumb">
             <img
               src={`https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg`}
@@ -147,9 +156,16 @@ function StatusPost({ post, onClick, name, avatar }) {
           </div>
         )}
         <div className="feed-post-status-text-wrap feed-post-status-collapsed">
-          <p className="feed-post-status-text">{displayText}</p>
+          <p className="feed-post-status-text">
+            {renderTextWithMentions(displayText, post.taggedUsers)}
+          </p>
           {isLong && <div className="feed-post-status-fade" />}
         </div>
+        {Array.isArray(post.claudeTags) && post.claudeTags.length > 0 && (
+          <div className="feed-post-tags">
+            {post.claudeTags.map((t) => <span key={t} className="feed-tag feed-tag-claude">#{t}</span>)}
+          </div>
+        )}
         <CardCounts post={post} />
       </div>
     </article>

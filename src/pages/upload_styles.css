@@ -1,7 +1,7 @@
-/* ── Upload page ── paste at bottom of index.css ── */
+/* ── Upload page ── */
 
 .upload-page {
-  max-width: 760px;
+  max-width: 1060px;
 }
 
 .upload-form {
@@ -10,15 +10,37 @@
   gap: 20px;
 }
 
+/* Layout: single column until an image is chosen, then side-by-side */
+.upload-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.upload-layout-two-col {
+  grid-template-columns: 360px 1fr;
+}
+
+.upload-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 24px;
+}
+
 /* Drop zone */
 .drop-zone {
   border: 1.5px dashed var(--border-bright);
-  border-radius: 14px;
-  background: var(--surface);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--cyan-glow), transparent 60%),
+    var(--surface);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
   overflow: hidden;
-  min-height: 200px;
+  min-height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,7 +49,16 @@
 .drop-zone:hover,
 .drop-zone.dragging {
   border-color: var(--cyan);
-  background: var(--cyan-glow);
+  box-shadow: 0 0 0 3px var(--cyan-glow), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.drop-zone.dragging {
+  transform: scale(1.01);
+}
+
+.drop-zone:hover .drop-zone-icon,
+.drop-zone.dragging .drop-zone-icon {
+  transform: translateY(-4px);
 }
 
 .drop-zone.has-image {
@@ -38,6 +69,7 @@
 
 .drop-zone-preview-link {
   display: block;
+  width: 100%;
 }
 
 .drop-zone-reupload {
@@ -48,15 +80,11 @@
 }
 
 .drop-zone-preview {
-  width: min(300px, 100%);
-  height: min(300px, 70vh);
-  max-width: 300px;
-  max-height: 300px;
+  width: 100%;
+  max-height: 420px;
   object-fit: contain;
   display: block;
-  border-radius: 12px;
   background: var(--bg2);
-  margin: 16px auto;
   cursor: zoom-in;
 }
 
@@ -64,30 +92,69 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 48px 24px;
+  gap: 10px;
+  padding: 56px 24px;
+  text-align: center;
 }
 
 .drop-zone-icon {
-  font-size: 40px;
+  font-size: 44px;
+  transition: transform 0.2s;
 }
 
 .drop-zone-label {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 .drop-zone-sub {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
   font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+/* Claude parse toggle */
+.upload-claude-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+
+.upload-claude-row:hover {
+  border-color: var(--border-bright);
+}
+
+.upload-claude-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upload-claude-label strong {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+}
+
+.upload-claude-label span {
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 /* Status banners */
 .upload-banner {
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 13px;
   font-family: var(--mono);
   display: flex;
@@ -146,7 +213,7 @@
 
 .upload-progress-fill {
   height: 100%;
-  background: var(--cyan);
+  background: linear-gradient(90deg, var(--cyan), var(--magenta));
   border-radius: 2px;
   transition: width 0.2s;
 }
@@ -155,14 +222,26 @@
 .upload-fields {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-fields::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta), transparent);
 }
 
 .upload-fields-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 18px;
   margin-bottom: 24px;
 }
 
@@ -194,12 +273,13 @@
   font-size: 14px;
   color: var(--text-h);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   width: 100%;
 }
 
 .upload-field-input:focus {
-  border-color: var(--border-bright);
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
 }
 
 .upload-field-input:disabled {
@@ -223,11 +303,30 @@
   gap: 10px;
 }
 
+@media (max-width: 920px) {
+  .upload-layout-two-col {
+    grid-template-columns: 1fr;
+  }
+  .upload-side {
+    position: static;
+  }
+}
+
 @media (max-width: 600px) {
+  .upload-fields {
+    padding: 20px;
+  }
   .upload-fields-grid {
     grid-template-columns: 1fr;
   }
   .upload-field-full {
     grid-column: 1;
+  }
+  .upload-actions {
+    flex-direction: column-reverse;
+  }
+  .upload-actions .btn-primary,
+  .upload-actions .btn-secondary {
+    width: 100%;
   }
 }

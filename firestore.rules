@@ -28,11 +28,38 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'banned']));
     }
 
+    // A likes/going toggle may only add or remove the caller's own uid
+    function togglesOnlySelf(field) {
+      let before = resource.data.get(field, []).toSet();
+      let after = request.resource.data.get(field, []).toSet();
+      return (after.difference(before) == [request.auth.uid].toSet()
+              && before.difference(after).size() == 0)
+          || (before.difference(after) == [request.auth.uid].toSet()
+              && after.difference(before).size() == 0);
+    }
+    // Comment counter may only move by one per write
+    function commentCountDeltaOk() {
+      let before = resource.data.get('commentCount', 0);
+      let after = request.resource.data.get('commentCount', 0);
+      return after == before + 1 || after == before - 1;
+    }
+    // Any signed-in user may touch ONLY the interaction fields
+    // (likes, RSVP, comment counter) on someone else's post — and only
+    // in ways that affect themselves.
+    function isInteractionUpdate() {
+      let keys = request.resource.data.diff(resource.data).affectedKeys();
+      return keys.hasOnly(['likes', 'going', 'commentCount'])
+        && (!keys.hasAny(['likes']) || togglesOnlySelf('likes'))
+        && (!keys.hasAny(['going']) || togglesOnlySelf('going'))
+        && (!keys.hasAny(['commentCount']) || commentCountDeltaOk());
+    }
+
     // ── Flyers ────────────────────────────────────────────────────
     match /flyers/{flyerId} {
       allow read: if true;
       allow create: if isAuth();
-      allow update: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+      allow update: if isAuth()
+        && (isOwner(resource.data.uploadedBy) || isMod() || isInteractionUpdate());
       allow delete: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
 
       match /comments/{commentId} {
@@ -46,7 +73,8 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if true;
       allow create: if isAuth();
-      allow update: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
+      allow update: if isAuth()
+        && (isOwner(resource.data.uploadedBy) || isMod() || isInteractionUpdate());
       allow delete: if isAuth() && (isOwner(resource.data.uploadedBy) || isMod());
 
       match /comments/{commentId} {
