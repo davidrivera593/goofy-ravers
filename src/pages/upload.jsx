@@ -237,7 +237,7 @@ Extract event details from this flyer and return ONLY a valid JSON object — no
     <AppLayout
       user={currentUser}
       title={editId ? 'Edit Flyer' : 'Upload Flyer'}
-      subtitle={editId ? 'Update the event details below.' : 'Drop your flyer image — flip the ✨ switch and Claude fills in the details.'}
+      subtitle={editId ? 'Update the event details below.' : 'i eat all imagez om nom nom'}
     >
       <div className="upload-page">
         <form className="upload-form" onSubmit={handleSubmit}>

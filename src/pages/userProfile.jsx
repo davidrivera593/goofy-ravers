@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
+import MasonryFeed from '../components/MasonryFeed'
+import OrganizerBadge from '../components/OrganizerBadge'
 import { renderTextWithMentions } from '../lib/mentions'
 
 const STATUS_COLLAPSE_CHARS = 180
@@ -59,7 +61,7 @@ function CardCounts({ post }) {
   )
 }
 
-function PostHeader({ post, name, avatar }) {
+function PostHeader({ post, name, avatar, isOrganizer }) {
   return (
     <div className="feed-post-header">
       <div className="feed-post-avatar">
@@ -69,7 +71,10 @@ function PostHeader({ post, name, avatar }) {
         }
       </div>
       <div>
-        <div className="feed-post-name">{name}</div>
+        <div className="feed-post-name-row">
+          <div className="feed-post-name">{name}</div>
+          <OrganizerBadge show={isOrganizer} />
+        </div>
         {post.uploadedAt?.toDate && (
           <div className="feed-post-date">
             {post.uploadedAt.toDate().toLocaleDateString('en-US', {
@@ -82,7 +87,7 @@ function PostHeader({ post, name, avatar }) {
   )
 }
 
-function FlyerPost({ post, onClick, name, avatar }) {
+function FlyerPost({ post, onClick, name, avatar, isOrganizer }) {
   const countdown = getCountdownLabel(post.date)
   return (
     <article className="feed-post feed-post-clickable" onClick={onClick}>
@@ -101,7 +106,7 @@ function FlyerPost({ post, onClick, name, avatar }) {
         </div>
       )}
       <div className="feed-post-body">
-        <PostHeader post={post} name={name} avatar={avatar} />
+        <PostHeader post={post} name={name} avatar={avatar} isOrganizer={isOrganizer} />
         <h2 className="feed-post-title">{post.title}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
@@ -125,7 +130,7 @@ function FlyerPost({ post, onClick, name, avatar }) {
   )
 }
 
-function StatusPost({ post, onClick, name, avatar }) {
+function StatusPost({ post, onClick, name, avatar, isOrganizer }) {
   const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
@@ -137,7 +142,7 @@ function StatusPost({ post, onClick, name, avatar }) {
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
-        <PostHeader post={post} name={name} avatar={avatar} />
+        <PostHeader post={post} name={name} avatar={avatar} isOrganizer={isOrganizer} />
         {images.length > 0 && (
           <div className="feed-post-status-image-wrap">
             <img src={images[0]} alt="Post image" className="feed-post-status-image" />
@@ -174,11 +179,13 @@ function StatusPost({ post, onClick, name, avatar }) {
 
 export default function UserProfile() {
   const { uid } = useParams()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isMod } = useAuth()
   const [profileName, setProfileName] = useState('')
   const [profileBio, setProfileBio] = useState('')
   const [profileAvatar, setProfileAvatar] = useState('')
+  const [profileIsOrganizer, setProfileIsOrganizer] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [revoking, setRevoking] = useState(false)
 
   const [flyers, setFlyers] = useState([])
   const [statusPosts, setStatusPosts] = useState([])
@@ -194,10 +201,12 @@ export default function UserProfile() {
         setProfileName(d.displayName || 'Raver')
         setProfileBio(d.bio || '')
         setProfileAvatar(d.avatarUrl || '')
+        setProfileIsOrganizer(Boolean(d.isOrganizer))
       } else {
         setProfileName('Raver')
         setProfileBio('')
         setProfileAvatar('')
+        setProfileIsOrganizer(false)
       }
       setIsLoadingProfile(false)
     }, (err) => {
@@ -205,6 +214,20 @@ export default function UserProfile() {
       setIsLoadingProfile(false)
     })
   }, [uid])
+
+  // Mods/admins can strip an abused organizer badge
+  async function handleRevokeOrganizer() {
+    if (!confirm('Remove this user’s organizer badge?')) return
+    setRevoking(true)
+    try {
+      await updateDoc(doc(db, 'users', uid), { isOrganizer: false })
+    } catch (err) {
+      console.error('Revoke organizer failed:', err)
+      alert(err.message)
+    } finally {
+      setRevoking(false)
+    }
+  }
 
   // Load profile user's flyers
   useEffect(() => {
@@ -265,7 +288,20 @@ export default function UserProfile() {
         </div>
         <div className="profile-info">
           <div className="profile-name-row">
-            <h1 className="profile-name">{profileName}</h1>
+            <div className="profile-name-badge-row">
+              <h1 className="profile-name">{profileName}</h1>
+              <OrganizerBadge show={profileIsOrganizer} size="lg" />
+            </div>
+            {isMod && profileIsOrganizer && (
+              <button
+                type="button"
+                className="organizer-revoke-btn"
+                onClick={handleRevokeOrganizer}
+                disabled={revoking}
+              >
+                {revoking ? 'Removing…' : 'Revoke organizer badge'}
+              </button>
+            )}
           </div>
           {profileBio
             ? <p className="profile-bio" style={{ whiteSpace: 'pre-wrap' }}>{profileBio}</p>
@@ -292,14 +328,15 @@ export default function UserProfile() {
         </div>
       )}
 
-      <div className="feed">
-        {posts.map((post) => {
+      <MasonryFeed
+        items={posts}
+        renderItem={(post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
-            ? <StatusPost key={post.id} post={post} onClick={openModal} name={profileName} avatar={profileAvatar} />
-            : <FlyerPost key={post.id} post={post} onClick={openModal} name={profileName} avatar={profileAvatar} />
-        })}
-      </div>
+            ? <StatusPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} name={profileName} avatar={profileAvatar} isOrganizer={profileIsOrganizer} />
+            : <FlyerPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} name={profileName} avatar={profileAvatar} isOrganizer={profileIsOrganizer} />
+        }}
+      />
 
       {liveSelectedPost && (
         <PostModal
@@ -307,6 +344,7 @@ export default function UserProfile() {
           collection={liveSelectedPost._col}
           currentUser={currentUser}
           avatarCache={{ [uid]: profileAvatar }}
+          posterIsOrganizer={profileIsOrganizer}
           onClose={() => setSelectedPost(null)}
         />
       )}

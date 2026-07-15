@@ -11,6 +11,8 @@ import { useAuth } from '../contexts/AuthContext'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import StatusComposer from '../components/StatusComposer'
+import MasonryFeed from '../components/MasonryFeed'
+import OrganizerBadge from '../components/OrganizerBadge'
 import { renderTextWithMentions } from '../lib/mentions'
 
 /**
@@ -69,7 +71,7 @@ function CardCounts({ post }) {
   )
 }
 
-function PostHeader({ post, avatarCache }) {
+function PostHeader({ post, avatarCache, isOrganizer }) {
   const posterName = post.uploadedByName || 'Raver'
   const avatar = post.uploadedByAvatar || (avatarCache && avatarCache[post.uploadedBy]) || ''
   return (
@@ -81,18 +83,21 @@ function PostHeader({ post, avatarCache }) {
         }
       </div>
       <div>
-        {post.uploadedBy
-          ? (
-            <Link
-              to={`/profile/${post.uploadedBy}`}
-              className="feed-post-name feed-post-name-link"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {posterName}
-            </Link>
-          )
-          : <div className="feed-post-name">{posterName}</div>
-        }
+        <div className="feed-post-name-row">
+          {post.uploadedBy
+            ? (
+              <Link
+                to={`/profile/${post.uploadedBy}`}
+                className="feed-post-name feed-post-name-link"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {posterName}
+              </Link>
+            )
+            : <div className="feed-post-name">{posterName}</div>
+          }
+          <OrganizerBadge show={isOrganizer} />
+        </div>
         {post.uploadedAt?.toDate && (
           <div className="feed-post-date">
             {post.uploadedAt.toDate().toLocaleDateString('en-US', {
@@ -105,7 +110,7 @@ function PostHeader({ post, avatarCache }) {
   )
 }
 
-function FlyerPost({ post, onClick, avatarCache }) {
+function FlyerPost({ post, onClick, avatarCache, isOrganizer }) {
   const countdown = getCountdownLabel(post.date)
   return (
     <article className="feed-post feed-post-clickable" onClick={onClick}>
@@ -124,7 +129,7 @@ function FlyerPost({ post, onClick, avatarCache }) {
         </div>
       )}
       <div className="feed-post-body">
-        <PostHeader post={post} avatarCache={avatarCache} />
+        <PostHeader post={post} avatarCache={avatarCache} isOrganizer={isOrganizer} />
         <h2 className="feed-post-title">{post.title}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
@@ -148,7 +153,7 @@ function FlyerPost({ post, onClick, avatarCache }) {
   )
 }
 
-function StatusPost({ post, onClick, avatarCache }) {
+function StatusPost({ post, onClick, avatarCache, isOrganizer }) {
   const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
@@ -160,7 +165,7 @@ function StatusPost({ post, onClick, avatarCache }) {
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
-        <PostHeader post={post} avatarCache={avatarCache} />
+        <PostHeader post={post} avatarCache={avatarCache} isOrganizer={isOrganizer} />
         {images.length > 0 && (
           <div className="feed-post-status-image-wrap">
             <img src={images[0]} alt="Post image" className="feed-post-status-image" />
@@ -233,18 +238,22 @@ export default function Dashboard() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [selectedPost, setSelectedPost] = useState(null) // { id, col }
   const [avatarCache, setAvatarCache] = useState({}) // uid → avatarUrl
+  const [organizerSet, setOrganizerSet] = useState(() => new Set()) // uids flagged as organizers
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-  // Listen to all user docs for avatar URLs
+  // Listen to all user docs for avatar URLs + organizer status
   useEffect(() => {
     return onSnapshot(collection(db, 'users'), (snap) => {
       const cache = {}
+      const organizers = new Set()
       snap.docs.forEach((d) => {
         const data = d.data()
         if (data.avatarUrl) cache[d.id] = data.avatarUrl
+        if (data.isOrganizer) organizers.add(d.id)
       })
       setAvatarCache(cache)
+      setOrganizerSet(organizers)
     }, (err) => {
       console.error('Failed to load user avatars:', err)
     })
@@ -344,14 +353,16 @@ export default function Dashboard() {
         <p className="flyers-status">No matches. Try a different search.</p>
       )}
 
-      <div className="feed">
-        {visiblePosts.map((post) => {
+      <MasonryFeed
+        items={visiblePosts}
+        renderItem={(post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
+          const posterIsOrganizer = organizerSet.has(post.uploadedBy)
           return post.postType === 'status'
-            ? <StatusPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
-            : <FlyerPost key={post.id} post={post} onClick={openModal} avatarCache={avatarCache} />
-        })}
-      </div>
+            ? <StatusPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} avatarCache={avatarCache} isOrganizer={posterIsOrganizer} />
+            : <FlyerPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} avatarCache={avatarCache} isOrganizer={posterIsOrganizer} />
+        }}
+      />
 
       {visibleCount < filteredPosts.length && (
         <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
@@ -371,6 +382,7 @@ export default function Dashboard() {
           collection={liveSelectedPost._col}
           currentUser={currentUser}
           avatarCache={avatarCache}
+          posterIsOrganizer={organizerSet.has(liveSelectedPost.uploadedBy)}
           onClose={() => setSelectedPost(null)}
         />
       )}

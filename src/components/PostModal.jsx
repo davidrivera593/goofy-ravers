@@ -19,6 +19,7 @@ import { deleteObject, ref as storageRef } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 import { useAuth } from '../contexts/AuthContext'
 import { renderTextWithMentions } from '../lib/mentions'
+import OrganizerBadge from './OrganizerBadge'
 
 function extractYouTubeId(url) {
   if (!url) return null
@@ -36,7 +37,7 @@ function extractYouTubeId(url) {
 
 const REPORT_REASONS = ['Spam', 'Inappropriate', 'Harassment', 'Other']
 
-export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, onClose }) {
+export default function PostModal({ post, collection: colName, currentUser, avatarCache = {}, posterIsOrganizer = false, onClose }) {
   const navigate = useNavigate()
   const { isMod, isAdmin, userDoc } = useAuth()
   const [comments, setComments] = useState([])
@@ -238,10 +239,13 @@ export default function PostModal({ post, collection: colName, currentUser, avat
             }
           </div>
           <div>
-            {post.uploadedBy
-              ? <Link to={`/profile/${post.uploadedBy}`} className="post-modal-name post-modal-name-link" onClick={onClose}>{posterName}</Link>
-              : <div className="post-modal-name">{posterName}</div>
-            }
+            <div className="post-modal-name-row">
+              {post.uploadedBy
+                ? <Link to={`/profile/${post.uploadedBy}`} className="post-modal-name post-modal-name-link" onClick={onClose}>{posterName}</Link>
+                : <div className="post-modal-name">{posterName}</div>
+              }
+              <OrganizerBadge show={posterIsOrganizer} />
+            </div>
             {post.uploadedAt?.toDate && (
               <div className="post-modal-date">
                 {post.uploadedAt.toDate().toLocaleDateString('en-US', {

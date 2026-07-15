@@ -1213,14 +1213,22 @@ h1, h2, h3 {
   color: var(--text-dim);
 }
 
-/* Row-major grid: newest post top-left, next one to its right —
-   NOT CSS columns, which would fill the first column top-to-bottom. */
+/* Pinterest-style masonry: a row of equal-width columns, each a natural-height
+   stack. Column bucketing is done in JS (MasonryFeed) so newest posts read
+   left-to-right across the top — NOT CSS `columns`, which fills top-to-bottom. */
 .feed {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: flex-start;
   gap: 16px;
-  align-items: start;
   margin-top: 12px;
+}
+
+.feed-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ── Flyer card — vertical stack ── */
@@ -1507,12 +1515,6 @@ a.feed-post-name-link:hover {
   letter-spacing: 0.04em;
 }
 
-@media (max-width: 1024px) and (min-width: 769px) {
-  .feed {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
   .dashboard-nav { padding: 0 16px; }
   .nav-links { display: none; }
@@ -1534,7 +1536,9 @@ a.feed-post-name-link:hover {
     max-height: 48svh;
   }
   .feed {
-    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .feed-col {
     gap: 12px;
   }
   .feed-compose-btn {
@@ -2836,4 +2840,93 @@ a.post-modal-name-link:hover {
 
 .post-modal-comment-delete:hover {
   color: var(--danger);
+}
+
+/* ── Organizer badge (soft self-serve identity signal) ── */
+.organizer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--pill);
+  background: rgba(255, 122, 26, 0.14);
+  border: 1px solid rgba(255, 122, 26, 0.4);
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.organizer-badge-lg {
+  font-size: 11px;
+  padding: 3px 11px;
+}
+
+.organizer-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex-shrink: 0;
+}
+
+/* name + badge sit on one row inside feed card / modal headers */
+.feed-post-name-row,
+.post-modal-name-row,
+.profile-name-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Organizer self-toggle row (profile edit) ── */
+.profile-organizer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.profile-organizer-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-organizer-label strong {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+}
+
+.profile-organizer-label span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* mod/admin revoke button on a profile */
+.organizer-revoke-btn {
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--pill);
+  padding: 5px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.organizer-revoke-btn:hover {
+  background: rgba(255, 77, 109, 0.24);
 }

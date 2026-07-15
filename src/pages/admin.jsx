@@ -100,6 +100,19 @@ export default function Admin() {
     }
   }
 
+  async function handleRevokeOrganizer(targetUid) {
+    if (!confirm('Remove this user’s organizer badge?')) return
+    setActionLoading((prev) => ({ ...prev, [targetUid]: true }))
+    try {
+      await updateDoc(doc(db, 'users', targetUid), { isOrganizer: false })
+    } catch (err) {
+      console.error('Revoke organizer failed:', err)
+      alert(err.message)
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [targetUid]: false }))
+    }
+  }
+
   async function handleDismissReport(reportId) {
     try {
       await updateDoc(doc(db, 'reports', reportId), {
@@ -204,6 +217,16 @@ export default function Admin() {
                         }
                       </div>
                       <span>{u.displayName || 'Unnamed'}</span>
+                      {u.isOrganizer && (
+                        <span style={{
+                          padding: '2px 8px', borderRadius: '20px', fontSize: '10px',
+                          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                          background: 'rgba(255,122,26,0.14)', border: '1px solid rgba(255,122,26,0.4)',
+                          color: 'var(--amber)', whiteSpace: 'nowrap',
+                        }}>
+                          Organizer
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '8px' }}>
                       <span style={{
@@ -257,6 +280,15 @@ export default function Admin() {
                             </button>
                           )}
                         </>
+                      )}
+                      {!isSelf && u.isOrganizer && (
+                        <button
+                          onClick={() => handleRevokeOrganizer(u.uid)}
+                          disabled={loading}
+                          style={actionBtnStyle('var(--amber)')}
+                        >
+                          Revoke Organizer
+                        </button>
                       )}
                       {isSelf && <span style={{ opacity: 0.5, fontSize: '11px' }}>You</span>}
                     </td>
@@ -355,9 +387,11 @@ export default function Admin() {
 }
 
 function actionBtnStyle(bg) {
+  // Light accent backgrounds (cyan/amber) need dark text for contrast
+  const darkText = bg === 'var(--cyan)' || bg === 'var(--amber)'
   return {
     background: bg,
-    color: bg === 'var(--cyan)' ? '#000' : '#fff',
+    color: darkText ? '#0a0a10' : '#fff',
     border: 'none',
     borderRadius: '4px',
     padding: '4px 10px',

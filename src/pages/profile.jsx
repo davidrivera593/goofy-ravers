@@ -19,6 +19,8 @@ import { isUsernameTaken, validateUsername } from '../lib/username'
 import AppLayout from '../components/AppLayout'
 import PostModal from '../components/PostModal'
 import StatusComposer from '../components/StatusComposer'
+import MasonryFeed from '../components/MasonryFeed'
+import OrganizerBadge from '../components/OrganizerBadge'
 import { renderTextWithMentions } from '../lib/mentions'
 
 const STATUS_COLLAPSE_CHARS = 180
@@ -73,7 +75,7 @@ function CardCounts({ post }) {
   )
 }
 
-function PostHeader({ post, displayName, initials, avatarUrl }) {
+function PostHeader({ post, displayName, initials, avatarUrl, isOrganizer }) {
   const posterName = displayName || post.uploadedByName || 'Raver'
   const initial = initials || posterName[0].toUpperCase()
   const avatar = avatarUrl || post.uploadedByAvatar || ''
@@ -86,7 +88,10 @@ function PostHeader({ post, displayName, initials, avatarUrl }) {
         }
       </div>
       <div>
-        <div className="feed-post-name">{posterName}</div>
+        <div className="feed-post-name-row">
+          <div className="feed-post-name">{posterName}</div>
+          <OrganizerBadge show={isOrganizer} />
+        </div>
         {post.uploadedAt?.toDate && (
           <div className="feed-post-date">
             {post.uploadedAt.toDate().toLocaleDateString('en-US', {
@@ -99,7 +104,7 @@ function PostHeader({ post, displayName, initials, avatarUrl }) {
   )
 }
 
-function FlyerPost({ post, onClick, displayName, initials, avatarUrl }) {
+function FlyerPost({ post, onClick, displayName, initials, avatarUrl, isOrganizer }) {
   const countdown = getCountdownLabel(post.date)
   return (
     <article className="feed-post feed-post-clickable" onClick={onClick}>
@@ -118,7 +123,7 @@ function FlyerPost({ post, onClick, displayName, initials, avatarUrl }) {
         </div>
       )}
       <div className="feed-post-body">
-        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
+        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} isOrganizer={isOrganizer} />
         <h2 className="feed-post-title">{post.title}</h2>
         <div className="feed-post-meta">
           {post.date && <span>📅 {post.date}</span>}
@@ -142,7 +147,7 @@ function FlyerPost({ post, onClick, displayName, initials, avatarUrl }) {
   )
 }
 
-function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
+function StatusPost({ post, onClick, displayName, initials, avatarUrl, isOrganizer }) {
   const isLong = post.text && post.text.length > STATUS_COLLAPSE_CHARS
   const displayText = isLong
     ? post.text.slice(0, STATUS_COLLAPSE_CHARS).trimEnd() + '…'
@@ -154,7 +159,7 @@ function StatusPost({ post, onClick, displayName, initials, avatarUrl }) {
   return (
     <article className="feed-post feed-post-status feed-post-clickable" onClick={onClick}>
       <div className="feed-post-body">
-        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
+        <PostHeader post={post} displayName={displayName} initials={initials} avatarUrl={avatarUrl} isOrganizer={isOrganizer} />
         {images.length > 0 && (
           <div className="feed-post-status-image-wrap">
             <img src={images[0]} alt="Post image" className="feed-post-status-image" />
@@ -199,6 +204,7 @@ export default function Profile() {
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [favoriteTrackUrl, setFavoriteTrackUrl] = useState('')
+  const [isOrganizer, setIsOrganizer] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -207,6 +213,7 @@ export default function Profile() {
   const [draftName, setDraftName] = useState('')
   const [draftBio, setDraftBio] = useState('')
   const [draftFavoriteTrackUrl, setDraftFavoriteTrackUrl] = useState('')
+  const [draftIsOrganizer, setDraftIsOrganizer] = useState(false)
   const [trackSearch, setTrackSearch] = useState('')
 
   const [flyers, setFlyers] = useState([])
@@ -227,11 +234,13 @@ export default function Profile() {
         setBio(data.bio || '')
         setAvatarUrl(data.avatarUrl || '')
         setFavoriteTrackUrl(data.favoriteTrackUrl || '')
+        setIsOrganizer(Boolean(data.isOrganizer))
       } else {
         setDisplayName(currentUser.displayName || 'Raver')
         setBio('')
         setAvatarUrl('')
         setFavoriteTrackUrl('')
+        setIsOrganizer(false)
       }
     })
   }, [currentUser])
@@ -277,6 +286,7 @@ export default function Profile() {
     setDraftName(displayName)
     setDraftBio(bio)
     setDraftFavoriteTrackUrl(favoriteTrackUrl)
+    setDraftIsOrganizer(isOrganizer)
     setTrackSearch('')
     setIsEditing(true)
     setSaveMsg('')
@@ -342,6 +352,7 @@ export default function Profile() {
           displayNameLower: newName.toLowerCase(),
           bio: draftBio.trim(),
           favoriteTrackUrl: cleanedTrackUrl,
+          isOrganizer: draftIsOrganizer,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -500,6 +511,30 @@ export default function Profile() {
                 )}
               </div>
 
+              <label
+                className="profile-organizer-row"
+                onClick={() => !isSaving && setDraftIsOrganizer((v) => !v)}
+              >
+                <span
+                  role="switch"
+                  aria-checked={draftIsOrganizer}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isSaving) {
+                      e.preventDefault()
+                      setDraftIsOrganizer((v) => !v)
+                    }
+                  }}
+                  className={`feed-toggle-track${draftIsOrganizer ? ' feed-toggle-track--on' : ''}`}
+                >
+                  <span className={`feed-toggle-thumb${draftIsOrganizer ? ' feed-toggle-thumb--on' : ''}`} />
+                </span>
+                <span className="profile-organizer-label">
+                  <strong>Identify as an organizer</strong>
+                  <span>Shows an "Organizer" badge next to your name. Moderators may remove it if misused.</span>
+                </span>
+              </label>
+
               <div className="profile-edit-actions">
                 <button
                   type="button"
@@ -522,7 +557,10 @@ export default function Profile() {
           ) : (
             <>
               <div className="profile-name-row">
-                <h1 className="profile-name">{displayName}</h1>
+                <div className="profile-name-badge-row">
+                  <h1 className="profile-name">{displayName}</h1>
+                  <OrganizerBadge show={isOrganizer} size="lg" />
+                </div>
                 <button
                   type="button"
                   className="profile-edit-btn"
@@ -610,14 +648,15 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="feed">
-        {posts.slice(0, visibleCount).map((post) => {
+      <MasonryFeed
+        items={posts.slice(0, visibleCount)}
+        renderItem={(post) => {
           const openModal = () => setSelectedPost({ id: post.id, col: post._col })
           return post.postType === 'status'
-            ? <StatusPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
-            : <FlyerPost key={post.id} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
-        })}
-      </div>
+            ? <StatusPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} isOrganizer={isOrganizer} />
+            : <FlyerPost key={`${post._col}-${post.id}`} post={post} onClick={openModal} displayName={displayName} initials={initials} avatarUrl={avatarUrl} isOrganizer={isOrganizer} />
+        }}
+      />
 
       {visibleCount < posts.length && (
         <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
@@ -637,6 +676,7 @@ export default function Profile() {
           collection={liveSelectedPost._col}
           currentUser={currentUser}
           avatarCache={{ [currentUser?.uid]: avatarUrl }}
+          posterIsOrganizer={isOrganizer}
           onClose={() => setSelectedPost(null)}
         />
       )}

@@ -23,9 +23,16 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if true;
       allow create: if isOwner(uid);
-      // Users can update their own doc but CANNOT change their own role or banned fields
-      allow update: if isOwner(uid)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'banned']));
+      // Owners can update their own doc but CANNOT change their own role or
+      // banned fields. Mods/admins may additionally revoke (or grant) another
+      // user's organizer badge — and ONLY that field — to shut down
+      // impersonation. The organizer badge is a soft, self-serve identity
+      // signal and grants no permissions.
+      allow update: if
+        (isOwner(uid)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'banned']))
+        || (isMod()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOrganizer']));
     }
 
     // A likes/going toggle may only add or remove the caller's own uid
